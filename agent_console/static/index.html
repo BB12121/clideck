@@ -1,0 +1,3243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CliDeck</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111111;
+      --panel: #181818;
+      --panel-2: #202020;
+      --line: #343434;
+      --line-soft: #282828;
+      --text: #ece7dc;
+      --muted: #a8a095;
+      --faint: #766f66;
+      --good: #7fb069;
+      --warn: #d9a441;
+      --bad: #c85f5f;
+      --info: #6ea4a5;
+      --ink: #0f0f0f;
+    }
+
+    * { box-sizing: border-box; }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Aptos", "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+    }
+
+    .shell {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    body.session-route {
+      overflow: hidden;
+    }
+
+    body.session-route .shell {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    body.session-route .topbar {
+      display: none;
+    }
+
+    body.session-route #add-panel,
+    body.session-route #counts,
+    body.session-route #controls,
+    body.session-route #new-session-panel,
+    body.session-route #message,
+    body.session-route #hosts {
+      display: none !important;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: end;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .subline {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 7px 10px;
+      min-height: 34px;
+    }
+
+    .button:hover {
+      border-color: #5a534b;
+      background: #282623;
+    }
+
+    .button.compact {
+      padding: 4px 8px;
+      min-height: 28px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .button + .button {
+      margin-left: 4px;
+    }
+
+    .button.copied {
+      border-color: var(--good);
+      color: #d9f0d0;
+    }
+
+    .updated {
+      color: var(--faint);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .notify-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #151515;
+      color: var(--muted);
+      padding: 7px 9px;
+      font-size: 12px;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .notify-toggle input {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--good);
+    }
+
+    .counts {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      margin: 14px 0;
+    }
+
+    .metric {
+      border: 1px solid var(--line-soft);
+      background: var(--panel);
+      border-radius: 6px;
+      padding: 10px;
+      min-width: 0;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      margin-top: 4px;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) 180px;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .new-session {
+      display: grid;
+      grid-template-columns: 180px minmax(220px, 1fr) 180px auto;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 10px;
+      border: 1px solid var(--line-soft);
+      border-radius: 6px;
+      background: #151515;
+    }
+
+    .field {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #141414;
+      color: var(--text);
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    .field:focus {
+      border-color: var(--info);
+    }
+
+    .state {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      padding: 16px;
+      color: var(--muted);
+    }
+
+    .state.error {
+      border-color: #6f3c30;
+      color: #f2c7b9;
+      background: #211715;
+    }
+
+    .completion-popup {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 50;
+      display: none;
+      width: min(380px, calc(100vw - 36px));
+      border: 1px solid #4c5d3f;
+      border-left: 4px solid var(--good);
+      border-radius: 7px;
+      background: #171b15;
+      color: var(--text);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, .35);
+      padding: 12px;
+    }
+
+    .completion-popup.show {
+      display: block;
+    }
+
+    .completion-popup-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: start;
+      font-weight: 700;
+    }
+
+    .completion-popup-body {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .add-panel {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      padding: 12px;
+      margin: 14px 0;
+    }
+
+    .add-panel.open {
+      display: block;
+    }
+
+    .add-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      align-items: end;
+    }
+
+    .field-label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .candidate-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .configured-list {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .candidate {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      border: 1px solid var(--line-soft);
+      border-radius: 6px;
+      background: #151515;
+      padding: 8px;
+    }
+
+    .configured-host {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      border: 1px solid var(--line-soft);
+      border-radius: 6px;
+      background: #151515;
+      padding: 8px;
+    }
+
+    .candidate-title,
+    .candidate-sub,
+    .configured-title,
+    .configured-sub {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .candidate-sub,
+    .configured-sub {
+      color: var(--faint);
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .host {
+      margin-top: 12px;
+      border-top: 1px solid var(--line);
+      border-left: 3px solid var(--host-accent, var(--line));
+      padding-top: 10px;
+      padding-left: 10px;
+    }
+
+    .host-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .host-title {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      min-width: 0;
+    }
+
+    .host-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--host-accent, var(--info));
+      flex: 0 0 auto;
+      align-self: center;
+    }
+
+    .host-name {
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .host-id {
+      color: var(--faint);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .host-meta {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .host-errors {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .host-error {
+      border: 1px solid #684a22;
+      border-radius: 6px;
+      background: #241c12;
+      color: #f0d49b;
+      padding: 8px 10px;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--panel);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line-soft);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #151515;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    tbody tr:hover {
+      background: #1d1b19;
+    }
+
+    .detail-row td {
+      background: #141312;
+      padding: 0;
+    }
+
+    .conversation {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border-left: 3px solid var(--host-accent, var(--line));
+    }
+
+    .chat-transcript {
+      display: grid;
+      gap: 8px;
+      max-height: 520px;
+      overflow: auto;
+      padding: 2px 2px 4px;
+    }
+
+    .chat-message {
+      display: grid;
+      gap: 4px;
+      max-width: min(76ch, 82%);
+    }
+
+    .chat-message.user {
+      justify-self: end;
+    }
+
+    .chat-message.assistant,
+    .chat-message.tool,
+    .chat-message.system {
+      justify-self: start;
+    }
+
+    .chat-role {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .chat-message.user .chat-role {
+      text-align: right;
+    }
+
+    .chat-bubble {
+      border: 1px solid var(--line-soft);
+      border-radius: 8px;
+      background: #1b1b1a;
+      padding: 9px 10px;
+      overflow-wrap: anywhere;
+      line-height: 1.42;
+    }
+
+    .chat-bubble.raw {
+      white-space: pre-wrap;
+    }
+
+    .chat-message.user .chat-bubble {
+      background: color-mix(in srgb, var(--host-accent, #7fb069) 28%, #171817);
+      border-color: color-mix(in srgb, var(--host-accent, #7fb069) 45%, var(--line-soft));
+    }
+
+    .chat-message.tool .chat-bubble,
+    .chat-message.system .chat-bubble {
+      background: #151515;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .chat-message.collapsible {
+      max-width: min(88ch, 92%);
+    }
+
+    .chat-message.collapsible summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 12px;
+      list-style-position: inside;
+      user-select: none;
+    }
+
+    .chat-message.collapsible .chat-bubble {
+      margin-top: 6px;
+    }
+
+    .chat-summary {
+      margin-left: 6px;
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .markdown {
+      white-space: normal;
+    }
+
+    .markdown p,
+    .markdown ul,
+    .markdown pre,
+    .markdown table {
+      margin: 0 0 8px;
+    }
+
+    .markdown p:last-child,
+    .markdown ul:last-child,
+    .markdown pre:last-child,
+    .markdown table:last-child {
+      margin-bottom: 0;
+    }
+
+    .markdown ul {
+      padding-left: 18px;
+    }
+
+    .markdown h1,
+    .markdown h2,
+    .markdown h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .markdown code {
+      border: 1px solid var(--line-soft);
+      border-radius: 4px;
+      background: #111;
+      padding: 1px 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .markdown pre {
+      overflow: auto;
+      border: 1px solid var(--line-soft);
+      border-radius: 6px;
+      background: #111;
+      padding: 8px;
+    }
+
+    .markdown pre code {
+      border: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    .markdown a {
+      color: #8fc1ff;
+    }
+
+    .markdown table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: auto;
+      font-size: 12px;
+    }
+
+    .markdown th,
+    .markdown td {
+      border: 1px solid var(--line-soft);
+      padding: 6px 7px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    .markdown th {
+      background: #151515;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: none;
+    }
+
+    .markdown-path {
+      color: #d4bd7a;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .screen-control {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: start;
+      border: 1px solid var(--line-soft);
+      border-radius: 6px;
+      background: #161616;
+      padding: 8px;
+      margin-top: 4px;
+    }
+
+    .screen-assignment {
+      display: grid;
+      grid-template-columns: minmax(160px, 260px) minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      border: 1px solid var(--line-soft);
+      border-radius: 6px;
+      background: #161616;
+      padding: 8px;
+      margin-top: 4px;
+    }
+
+    .screen-control textarea {
+      min-height: 68px;
+      resize: vertical;
+    }
+
+    .approval-panel {
+      grid-column: 1 / -1;
+      border: 1px solid #66583f;
+      background: #252018;
+      border-radius: 8px;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .approval-title {
+      color: #f4d597;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .approval-detail {
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .approval-reason {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .approval-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .approval-actions .button {
+      margin-left: 0;
+    }
+
+    .screen-status {
+      grid-column: 1 / -1;
+      color: var(--faint);
+      font-size: 12px;
+      min-height: 16px;
+    }
+
+    .session-page {
+      display: none;
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      height: 100%;
+      min-height: 0;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 16px;
+      padding-top: 18px;
+      overflow: hidden;
+    }
+
+    .session-page.open {
+      display: grid;
+    }
+
+    .session-head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 14px;
+    }
+
+    .session-title {
+      min-width: 0;
+    }
+
+    .session-title .primary {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .session-title .mini {
+      margin-top: 3px;
+    }
+
+    .session-chat {
+      display: grid;
+      align-content: start;
+      gap: 16px;
+      min-height: 0;
+      overflow: auto;
+      padding: 8px 6px 18px;
+    }
+
+    .session-chat .chat-message.user {
+      justify-self: end;
+    }
+
+    .session-chat .chat-message.assistant,
+    .session-chat .chat-message.tool,
+    .session-chat .chat-message.system {
+      justify-self: start;
+    }
+
+    .session-chat .chat-message {
+      max-width: min(980px, 92%);
+      gap: 6px;
+    }
+
+    .session-chat .chat-message.user {
+      max-width: min(760px, 78%);
+    }
+
+    .session-chat .chat-message.collapsible {
+      max-width: min(980px, 92%);
+    }
+
+    .session-chat .chat-role {
+      font-size: 11px;
+      letter-spacing: .02em;
+    }
+
+    .session-chat .chat-bubble {
+      padding: 13px 15px;
+      font-size: 15px;
+      line-height: 1.58;
+    }
+
+    .session-chat .chat-message.pending .chat-bubble {
+      color: var(--muted);
+    }
+
+    .thinking-dots {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      min-width: 48px;
+    }
+
+    .thinking-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: .45;
+      animation: thinkingPulse 1.15s infinite ease-in-out;
+    }
+
+    .thinking-dots span:nth-child(2) {
+      animation-delay: .16s;
+    }
+
+    .thinking-dots span:nth-child(3) {
+      animation-delay: .32s;
+    }
+
+    @keyframes thinkingPulse {
+      0%, 80%, 100% {
+        transform: translateY(0);
+        opacity: .35;
+      }
+      40% {
+        transform: translateY(-3px);
+        opacity: .9;
+      }
+    }
+
+    .session-chat .chat-message.tool .chat-bubble,
+    .session-chat .chat-message.system .chat-bubble {
+      font-size: 12.5px;
+      line-height: 1.52;
+    }
+
+    .session-empty {
+      align-self: center;
+      justify-self: center;
+      color: var(--muted);
+      border: 1px solid var(--line-soft);
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: #151515;
+    }
+
+    .session-composer {
+      position: sticky;
+      bottom: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #151515;
+      padding: 10px;
+      box-shadow: 0 -12px 24px rgba(0, 0, 0, .24);
+    }
+
+    .session-composer textarea {
+      min-height: 88px;
+      max-height: 220px;
+      resize: vertical;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .session-composer .screen-status {
+      grid-column: 1 / -1;
+    }
+
+    .check-label {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #141414;
+      padding: 8px 10px;
+      color: var(--text);
+      text-transform: none;
+      font-weight: 500;
+    }
+
+    .col-status { width: 150px; }
+    .col-host { width: 160px; }
+    .col-agent { width: 150px; }
+    .col-session { width: 240px; }
+    .col-activity { width: auto; }
+    .col-resume { width: 116px; }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: lowercase;
+      white-space: nowrap;
+    }
+
+    .status::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--faint);
+    }
+
+    .status.running::before { background: var(--good); }
+    .status.waiting::before { background: var(--warn); }
+    .status.stale::before { background: var(--bad); }
+    .status.completed::before { background: var(--info); }
+    .status.idle::before { background: var(--faint); }
+
+    .confidence,
+    .mini {
+      margin-top: 5px;
+      color: var(--faint);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .primary {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .activity {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      color: #ddd5c9;
+      line-height: 1.35;
+    }
+
+    .empty-host {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      padding: 10px;
+      color: var(--faint);
+      font-size: 12px;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 900px) {
+      .counts {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .table-wrap {
+        border: 0;
+        background: transparent;
+      }
+
+      table,
+      thead,
+      tbody,
+      tr,
+      th,
+      td {
+        display: block;
+      }
+
+      thead {
+        display: none;
+      }
+
+      tr {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel);
+        margin-bottom: 8px;
+        overflow: hidden;
+      }
+
+      td {
+        display: grid;
+        grid-template-columns: 88px minmax(0, 1fr);
+        gap: 10px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+
+      td:last-child {
+        border-bottom: 0;
+      }
+
+      .col-status,
+      .col-host,
+      .col-agent,
+      .col-session,
+      .col-activity,
+      .col-resume {
+        width: auto;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .shell {
+        padding: 12px;
+      }
+
+      .topbar,
+      .host-head,
+      .controls,
+      .add-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .top-actions {
+        justify-content: flex-start;
+      }
+
+      .completion-popup {
+        right: 12px;
+        bottom: 12px;
+        width: calc(100vw - 24px);
+      }
+
+      .counts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .new-session {
+        grid-template-columns: 1fr;
+      }
+
+      .session-head,
+      .session-composer {
+        grid-template-columns: 1fr;
+      }
+
+      .session-chat .chat-message,
+      .session-chat .chat-message.user,
+      .session-chat .chat-message.collapsible {
+        max-width: 100%;
+      }
+
+      .session-chat .chat-bubble {
+        font-size: 14px;
+        padding: 11px 12px;
+      }
+
+      .host-title {
+        display: grid;
+        gap: 2px;
+      }
+
+      .host-meta {
+        white-space: normal;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar" id="topbar">
+      <div>
+        <h1>CliDeck</h1>
+        <div class="subline">Multi-host Claude and Codex session inventory</div>
+      </div>
+      <div class="top-actions">
+        <span class="updated" id="updated">Not loaded</span>
+        <label class="notify-toggle" title="Show a desktop popup when a monitored task completes">
+          <input id="notify-completed" type="checkbox">
+          Notify done
+        </label>
+        <button class="button compact" id="test-notify" type="button">Test</button>
+        <button class="button" id="toggle-add" type="button">Servers</button>
+        <button class="button" id="refresh" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <section class="add-panel" id="add-panel" aria-label="Manage servers">
+      <div class="configured-list" id="host-list"></div>
+      <div class="add-grid">
+        <label class="field-label">
+          ID
+          <input class="field" id="host-id" type="text" placeholder="gpu-a">
+        </label>
+        <label class="field-label">
+          Label
+          <input class="field" id="host-label" type="text" placeholder="GPU A">
+        </label>
+        <label class="field-label">
+          SSH target
+          <input class="field" id="host-ssh" type="text" placeholder="user@host">
+        </label>
+        <label class="field-label">
+          Port
+          <input class="field" id="host-port" type="text" inputmode="numeric" placeholder="22">
+        </label>
+        <label class="field-label">
+          Password
+          <input class="field" id="host-password" type="password" placeholder="saved locally">
+        </label>
+        <label class="field-label">
+          Actions
+          <span class="check-label">
+            <input id="host-actions" type="checkbox">
+            Enable remote actions
+          </span>
+        </label>
+      </div>
+      <div class="top-actions" style="justify-content: flex-start; margin-top: 10px;">
+        <button class="button" id="save-host" type="button">Save Host</button>
+        <button class="button" id="cancel-edit" type="button">Cancel Edit</button>
+        <button class="button" id="load-candidates" type="button">Load VS Code Hosts</button>
+      </div>
+      <div class="candidate-list" id="candidate-list"></div>
+    </section>
+
+    <section class="counts" id="counts" aria-label="Session counts"></section>
+
+    <section class="controls" id="controls" aria-label="Filters">
+      <label>
+        <span class="visually-hidden">Search sessions</span>
+        <input class="field" id="query" type="search" placeholder="Search host, project, path, prompt, session">
+      </label>
+      <label>
+        <span class="visually-hidden">Status filter</span>
+        <select class="field" id="status">
+          <option value="">All statuses</option>
+          <option value="running">running</option>
+          <option value="waiting">waiting</option>
+          <option value="idle">idle</option>
+          <option value="stale">stale</option>
+          <option value="completed">completed</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="new-session" id="new-session-panel" aria-label="New remote Codex conversation">
+      <label>
+        <span class="visually-hidden">Remote host</span>
+        <select class="field" id="new-host"></select>
+      </label>
+      <label>
+        <span class="visually-hidden">Working directory</span>
+          <input class="field" id="new-cwd" type="text" list="new-cwd-options" placeholder="Choose or type remote cwd">
+          <datalist id="new-cwd-options"></datalist>
+      </label>
+      <label>
+        <span class="visually-hidden">Screen name</span>
+        <input class="field" id="new-screen" type="text" placeholder="screen name">
+      </label>
+      <button class="button" id="new-session" type="button">New Codex</button>
+    </section>
+
+    <section id="message" class="state">Loading snapshot...</section>
+    <section id="hosts" aria-label="Hosts"></section>
+    <section id="session-page" class="session-page" aria-label="Session conversation">
+      <div class="session-head" id="session-head"></div>
+      <div class="session-chat" id="session-chat"></div>
+      <div class="session-composer" id="session-composer"></div>
+    </section>
+    <aside class="completion-popup" id="completion-popup" role="status" aria-live="polite">
+      <div class="completion-popup-head">
+        <span id="completion-popup-title">Task completed</span>
+        <button class="button compact" id="completion-popup-close" type="button">Close</button>
+      </div>
+      <div class="completion-popup-body" id="completion-popup-body"></div>
+    </aside>
+  </main>
+
+  <script>
+    const AUTO_REFRESH_MS = 15_000;
+    const DETAIL_TIMELINE_LIMIT = 80;
+    const NOTIFY_COMPLETED_KEY = "agentConsoleNotifyCompleted";
+    const COMPLETED_STATUS = "completed";
+
+    const state = {
+      hosts: [],
+      counts: {},
+      query: "",
+      status: "",
+      copied: "",
+      loadedAt: null,
+      loading: false,
+      refreshing: false,
+      error: "",
+      addOpen: false,
+      configuredHosts: [],
+      editingHostId: "",
+      deletingHost: "",
+      candidates: [],
+      savingHost: false,
+      routeSessionKey: "",
+      detailKey: "",
+      detailLoading: false,
+      detailError: "",
+      detailTimeline: [],
+      detailTerminalCapture: "",
+      detailTerminalError: "",
+      screenInputs: {},
+      screenSending: "",
+      screenAssigning: "",
+      screenStatus: {},
+      approvals: {},
+      approvalResolving: "",
+      pendingMessages: {},
+      newSessionHost: "",
+      newSessionCwd: "",
+      newSessionScreen: "",
+      startingSession: false,
+      startSessionStatus: "",
+      notifyCompleted: window.localStorage.getItem(NOTIFY_COMPLETED_KEY) === "1",
+      knownSessionStatuses: new Map(),
+      notifiedCompletedKeys: new Set(),
+      completionPopupTimer: null,
+    };
+
+    const els = {
+      counts: document.getElementById("counts"),
+      topbar: document.getElementById("topbar"),
+      hosts: document.getElementById("hosts"),
+      controls: document.getElementById("controls"),
+      message: document.getElementById("message"),
+      query: document.getElementById("query"),
+      status: document.getElementById("status"),
+      newHost: document.getElementById("new-host"),
+      newCwd: document.getElementById("new-cwd"),
+      newCwdOptions: document.getElementById("new-cwd-options"),
+      newScreen: document.getElementById("new-screen"),
+      newSession: document.getElementById("new-session"),
+      newSessionPanel: document.getElementById("new-session-panel"),
+      refresh: document.getElementById("refresh"),
+      updated: document.getElementById("updated"),
+      notifyCompleted: document.getElementById("notify-completed"),
+      testNotify: document.getElementById("test-notify"),
+      toggleAdd: document.getElementById("toggle-add"),
+      addPanel: document.getElementById("add-panel"),
+      hostList: document.getElementById("host-list"),
+      hostId: document.getElementById("host-id"),
+      hostLabel: document.getElementById("host-label"),
+      hostSsh: document.getElementById("host-ssh"),
+      hostPort: document.getElementById("host-port"),
+      hostPassword: document.getElementById("host-password"),
+      hostActions: document.getElementById("host-actions"),
+      saveHost: document.getElementById("save-host"),
+      cancelEdit: document.getElementById("cancel-edit"),
+      loadCandidates: document.getElementById("load-candidates"),
+      candidateList: document.getElementById("candidate-list"),
+      completionPopup: document.getElementById("completion-popup"),
+      completionPopupTitle: document.getElementById("completion-popup-title"),
+      completionPopupBody: document.getElementById("completion-popup-body"),
+      completionPopupClose: document.getElementById("completion-popup-close"),
+      sessionPage: document.getElementById("session-page"),
+      sessionHead: document.getElementById("session-head"),
+      sessionChat: document.getElementById("session-chat"),
+      sessionComposer: document.getElementById("session-composer"),
+    };
+
+    function appBasePath() {
+      const marker = "/agent-console";
+      const index = window.location.pathname.indexOf(marker);
+      if (index >= 0) return window.location.pathname.slice(0, index + marker.length);
+      return window.location.pathname.replace(/\/sessions\/.*$/, "").replace(/\/$/, "");
+    }
+
+    function routeSessionKey() {
+      const prefix = `${appBasePath()}/sessions/`;
+      if (!window.location.pathname.startsWith(prefix)) return "";
+      return decodeURIComponent(window.location.pathname.slice(prefix.length));
+    }
+
+    function sessionPageUrl(key) {
+      return new URL(`${appBasePath()}/sessions/${encodeURIComponent(key)}`, window.location.origin).toString();
+    }
+
+    function apiUrl(forceRefresh = false, suffix = "/api/snapshot") {
+      const url = new URL(`${appBasePath()}${suffix}`, window.location.origin);
+      if (forceRefresh) {
+        url.searchParams.set("refresh", "1");
+      }
+      return url.toString();
+    }
+
+    function sessionUrl(key, suffix) {
+      return new URL(`${appBasePath()}/api/sessions/${encodeURIComponent(key)}${suffix}`, window.location.origin).toString();
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function display(value, fallback = "-") {
+      const text = String(value ?? "").trim();
+      return text || fallback;
+    }
+
+    function splitSshTarget(value) {
+      const target = String(value || "").trim();
+      if (!target.includes(":") || target.endsWith("]")) return { ssh: target, port: "" };
+      const [hostPart, portPart] = target.split(/:(?=[^:]*$)/);
+      if (!/^\d+$/.test(portPart || "")) return { ssh: target, port: "" };
+      return { ssh: hostPart, port: portPart };
+    }
+
+    function composeSshTarget(ssh, port) {
+      const target = String(ssh || "").trim();
+      const normalizedPort = String(port || "").trim();
+      if (!normalizedPort) return target;
+      return `${target}:${normalizedPort}`;
+    }
+
+    function sessionKey(host, session) {
+      return String(session.key || `${host.host_id || "host"}:${session.session_id || session.transcript_path || session.cwd || ""}`);
+    }
+
+    function sessionTitle(host, session) {
+      return display(session.project_name || session.cwd || session.session_id || session.key || host.host_label || host.host_id, "Session");
+    }
+
+    function collectSessionStatuses(hosts) {
+      const statuses = new Map();
+      (hosts || []).forEach((host) => {
+        (host.sessions || []).forEach((session) => {
+          statuses.set(sessionKey(host, session), {
+            status: session.status || "",
+            host,
+            session,
+          });
+        });
+      });
+      return statuses;
+    }
+
+    function showCompletionPopup(item) {
+      const hostLabel = item.host.host_label || item.host.host_id || "host";
+      const title = `${sessionTitle(item.host, item.session)} completed`;
+      const body = `${hostLabel} | ${display(item.session.cwd || item.session.last_prompt || item.session.key)}`;
+      els.completionPopupTitle.textContent = title;
+      els.completionPopupBody.textContent = body;
+      els.completionPopup.classList.add("show");
+      window.clearTimeout(state.completionPopupTimer);
+      state.completionPopupTimer = window.setTimeout(() => {
+        els.completionPopup.classList.remove("show");
+      }, 10_000);
+
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body });
+      }
+    }
+
+    function detectCompletedSessions(nextHosts) {
+      const nextStatuses = collectSessionStatuses(nextHosts);
+      if (state.notifyCompleted && state.loadedAt) {
+        nextStatuses.forEach((item, key) => {
+          const previous = state.knownSessionStatuses.get(key);
+          if (
+            previous
+            && previous.status !== COMPLETED_STATUS
+            && item.status === COMPLETED_STATUS
+            && !state.notifiedCompletedKeys.has(key)
+          ) {
+            state.notifiedCompletedKeys.add(key);
+            showCompletionPopup(item);
+          }
+        });
+      }
+      state.knownSessionStatuses = nextStatuses;
+    }
+
+    async function setNotifyCompleted(enabled) {
+      state.notifyCompleted = enabled;
+      window.localStorage.setItem(NOTIFY_COMPLETED_KEY, enabled ? "1" : "0");
+      try {
+        const response = await fetch(apiUrl(false, "/api/settings"), {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ desktop_notifications_enabled: enabled }),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Settings save failed with HTTP ${response.status}`);
+        }
+      } catch (error) {
+        state.error = `Unable to save notification setting. ${error.message}`;
+      }
+      if (enabled && "Notification" in window && Notification.permission === "default") {
+        try {
+          await Notification.requestPermission();
+        } catch (error) {
+          state.error = `Browser notification permission failed: ${error.message}`;
+        }
+      }
+      render();
+    }
+
+    async function loadSettings() {
+      try {
+        const response = await fetch(apiUrl(false, "/api/settings"), { headers: { "Accept": "application/json" } });
+        if (!response.ok) throw new Error(`Settings request failed with HTTP ${response.status}`);
+        const data = await response.json();
+        state.notifyCompleted = data.desktop_notifications_enabled === true;
+        window.localStorage.setItem(NOTIFY_COMPLETED_KEY, state.notifyCompleted ? "1" : "0");
+      } catch (_error) {
+        state.notifyCompleted = window.localStorage.getItem(NOTIFY_COMPLETED_KEY) === "1";
+      }
+    }
+
+    async function testNotification() {
+      try {
+        const response = await fetch(apiUrl(false, "/api/notifications/test"), {
+          method: "POST",
+          headers: { "Accept": "application/json" },
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Notification test failed with HTTP ${response.status}`);
+        }
+        state.error = "";
+      } catch (error) {
+        state.error = `Unable to send test notification. ${error.message}`;
+      }
+      render();
+    }
+
+    function hostAccent(hostId) {
+      const palette = ["#7fb069", "#d9a441", "#6ea4a5", "#c85f5f", "#9a8fbd", "#c28b5c", "#70a7d1", "#b76f96"];
+      const text = String(hostId || "local");
+      let hash = 0;
+      for (let i = 0; i < text.length; i += 1) {
+        hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+      }
+      return palette[hash % palette.length];
+    }
+
+    function formatAge(ms) {
+      if (!ms) return "unknown";
+      const diff = Math.max(0, Date.now() - ms);
+      if (diff < 60_000) return `${Math.round(diff / 1000)}s ago`;
+      if (diff < 3_600_000) return `${Math.round(diff / 60_000)}m ago`;
+      return `${Math.round(diff / 3_600_000)}h ago`;
+    }
+
+    function rowPayload(row) {
+      if (!row || typeof row !== "object") return {};
+      const payload = row.payload && typeof row.payload === "object" ? row.payload : row;
+      return payload.item && typeof payload.item === "object" ? payload.item : payload;
+    }
+
+    function contentText(content) {
+      if (typeof content === "string") return content;
+      if (!Array.isArray(content)) return "";
+      return content.map((item) => {
+        if (typeof item === "string") return item;
+        if (!item || typeof item !== "object") return "";
+        return item.text || item.content || item.output || item.input || "";
+      }).filter(Boolean).join("\n");
+    }
+
+    function truncateText(text, limit = 1200) {
+      const value = String(text || "").trim();
+      if (value.length <= limit) return value;
+      return `${value.slice(0, limit)}\n...`;
+    }
+
+    function renderInlineMarkdown(text) {
+      return text
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+        .replace(/\[([^\]]+)\]\((\/[^)\s]+)\)/g, '<span class="markdown-path" title="$2">$1</span>');
+    }
+
+    function markdownTableCells(line) {
+      const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+      return trimmed.split("|").map((cell) => renderInlineMarkdown(escapeHtml(cell.trim())));
+    }
+
+    function isMarkdownTableSeparator(line) {
+      return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line.trim());
+    }
+
+    function isMarkdownTableRow(line) {
+      return line.trim().includes("|") && !isMarkdownTableSeparator(line);
+    }
+
+    function renderMarkdownTable(rows) {
+      const header = markdownTableCells(rows[0]);
+      const bodyRows = rows.slice(2).map(markdownTableCells);
+      const head = `<thead><tr>${header.map((cell) => `<th>${cell}</th>`).join("")}</tr></thead>`;
+      const body = bodyRows.length
+        ? `<tbody>${bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody>`
+        : "";
+      return `<table>${head}${body}</table>`;
+    }
+
+    function renderMarkdownBlocks(lines) {
+      const html = [];
+      let paragraph = [];
+      let listOpen = false;
+
+      const closeParagraph = () => {
+        if (!paragraph.length) return;
+        html.push(`<p>${paragraph.join("<br>")}</p>`);
+        paragraph = [];
+      };
+      const closeList = () => {
+        if (!listOpen) return;
+        html.push("</ul>");
+        listOpen = false;
+      };
+
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
+        const trimmed = line.trim();
+        if (!trimmed) {
+          closeParagraph();
+          closeList();
+          continue;
+        }
+        if (isMarkdownTableRow(line) && index + 1 < lines.length && isMarkdownTableSeparator(lines[index + 1])) {
+          closeParagraph();
+          closeList();
+          const tableRows = [line, lines[index + 1]];
+          index += 2;
+          while (index < lines.length && isMarkdownTableRow(lines[index])) {
+            tableRows.push(lines[index]);
+            index += 1;
+          }
+          index -= 1;
+          html.push(renderMarkdownTable(tableRows));
+          continue;
+        }
+        const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+        if (heading) {
+          closeParagraph();
+          closeList();
+          const level = Math.min(3, heading[1].length);
+          html.push(`<h${level}>${renderInlineMarkdown(escapeHtml(heading[2]))}</h${level}>`);
+          continue;
+        }
+        const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+        if (bullet) {
+          closeParagraph();
+          if (!listOpen) {
+            html.push("<ul>");
+            listOpen = true;
+          }
+          html.push(`<li>${renderInlineMarkdown(escapeHtml(bullet[1]))}</li>`);
+          continue;
+        }
+        closeList();
+        paragraph.push(renderInlineMarkdown(escapeHtml(line)));
+      }
+
+      closeParagraph();
+      closeList();
+      return html.join("");
+    }
+
+    function renderMarkdown(text) {
+      const lines = String(text || "").replaceAll("\r\n", "\n").split("\n");
+      const html = [];
+      let plain = [];
+      let code = [];
+      let inCode = false;
+
+      const flushPlain = () => {
+        if (!plain.length) return;
+        html.push(renderMarkdownBlocks(plain));
+        plain = [];
+      };
+      const flushCode = () => {
+        html.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+        code = [];
+      };
+
+      lines.forEach((line) => {
+        if (line.trim().startsWith("```")) {
+          if (inCode) {
+            flushCode();
+            inCode = false;
+          } else {
+            flushPlain();
+            inCode = true;
+          }
+          return;
+        }
+        if (inCode) {
+          code.push(line);
+        } else {
+          plain.push(line);
+        }
+      });
+      if (inCode) flushCode();
+      flushPlain();
+      return html.join("") || escapeHtml(text);
+    }
+
+    function messageText(row) {
+      const payload = rowPayload(row);
+      if (payload.type === "token_count") return "";
+      if (payload.type === "reasoning") {
+        const summary = contentText(payload.summary);
+        return summary.trim();
+      }
+      if (typeof payload.message === "string") return payload.message.trim();
+      if (typeof payload.last_agent_message === "string") return payload.last_agent_message.trim();
+      if (typeof payload.codex_error_info === "string") return payload.codex_error_info.trim();
+      const directContent = contentText(payload.content);
+      if (directContent) return directContent.trim();
+      if (payload.message && typeof payload.message === "object") {
+        const messageContent = contentText(payload.message.content);
+        if (messageContent) return messageContent.trim();
+      }
+      if (typeof payload.arguments === "string") return payload.arguments.trim();
+      if (typeof payload.output === "string") return payload.output.trim();
+      if (payload.action && typeof payload.action === "object") {
+        return String(payload.action.command || payload.action.input || JSON.stringify(payload.action, null, 2)).trim();
+      }
+      return JSON.stringify(row, null, 2).trim();
+    }
+
+    function messageKind(row) {
+      const payload = rowPayload(row);
+      const rowType = row && typeof row === "object" ? row.type : "";
+      const type = payload.type || rowType || "";
+      const role = payload.role || (payload.message && payload.message.role) || "";
+      if (type === "user_message" || role === "user") return "user";
+      if (type === "agent_message" || type === "task_complete" || role === "assistant") return "assistant";
+      if (type.includes("function") || type.includes("tool") || type.includes("shell") || type.includes("exec")) return "tool";
+      return "system";
+    }
+
+    function messageLabel(row) {
+      const kind = messageKind(row);
+      if (kind === "user") return "You";
+      if (kind === "assistant") return "Codex";
+      if (kind === "tool") return "Tool";
+      const payload = rowPayload(row);
+      const rowType = row && typeof row === "object" ? row.type : "";
+      return payload.type || rowType || "System";
+    }
+
+    function isInternalTranscriptRow(row) {
+      const payload = rowPayload(row);
+      const rowType = row && typeof row === "object" ? row.type : "";
+      const type = payload.type || rowType || "";
+      const role = payload.role || (payload.message && payload.message.role) || "";
+      if (type === "turn_context") return true;
+      if (role === "developer" || role === "system") return true;
+      const text = messageText(row).trim();
+      return (
+        text.includes("<environment_context>")
+        || text.includes("<permissions instructions>")
+        || text.includes("<app-context>")
+        || text.includes("<personality_spec>")
+        || text.includes("<collaboration_mode>")
+        || text.includes("<skills_instructions>")
+        || text.includes("<plugins_instructions>")
+        || text.includes("<environment_context")
+        || text.includes("<filesystem>")
+        || text.includes("<workspace_roots>")
+      );
+    }
+
+    function renderChatMessage(kind, label, text, options = {}) {
+      const isDialogue = kind === "user" || kind === "assistant";
+      const pendingClass = options.pending ? " pending" : "";
+      if (!isDialogue && !options.expanded) {
+        const summary = truncateText(String(text || "").replace(/\s+/g, " "), 120);
+        return `
+          <details class="chat-message ${escapeHtml(kind)} collapsible">
+            <summary>
+              <span class="chat-role">${escapeHtml(label)}</span>
+              <span class="chat-summary">${escapeHtml(summary || "event")}</span>
+            </summary>
+            <div class="chat-bubble raw">${escapeHtml(text)}</div>
+          </details>
+        `;
+      }
+      const bubble = options.thinking
+        ? `<span class="thinking-dots" aria-label="Codex is thinking"><span></span><span></span><span></span></span>`
+        : (isDialogue ? renderMarkdown(text) : escapeHtml(text));
+      return `
+        <div class="chat-message ${escapeHtml(kind)}${pendingClass}">
+          <div class="chat-role">${escapeHtml(label)}</div>
+          <div class="chat-bubble ${isDialogue ? "markdown" : "raw"}">${bubble}</div>
+        </div>
+      `;
+    }
+
+    function dedupeMessages(messages) {
+      const seenDialogueText = new Set();
+      return messages.filter((message) => {
+        if (message.kind !== "assistant" && message.kind !== "user") return true;
+        const key = String(message.text || "").replace(/\s+/g, " ").trim();
+        if (!key) return false;
+        const scopedKey = `${message.kind}:${key}`;
+        if (seenDialogueText.has(scopedKey)) return false;
+        seenDialogueText.add(scopedKey);
+        return true;
+      });
+    }
+
+    function normalizeMessageText(text) {
+      return String(text || "").replace(/\s+/g, " ").trim();
+    }
+
+    function detailVisibleMessages(chronological = false) {
+      const rows = chronological ? state.detailTimeline.slice().reverse() : state.detailTimeline;
+      return dedupeMessages(rows.filter((row) => !isInternalTranscriptRow(row)).map((row) => ({
+        kind: messageKind(row),
+        label: messageLabel(row),
+        text: messageText(row),
+      })).filter((message) => message.text));
+    }
+
+    function transcriptHasMessage(messages, kind, text) {
+      const target = normalizeMessageText(text);
+      return messages.some((message) => message.kind === kind && normalizeMessageText(message.text) === target);
+    }
+
+    function transcriptHasAssistantAfterUser(messages, text) {
+      const target = normalizeMessageText(text);
+      const userIndex = messages.map((message) => (
+        message.kind === "user" && normalizeMessageText(message.text) === target
+      )).lastIndexOf(true);
+      if (userIndex < 0) return false;
+      return messages.slice(userIndex + 1).some((message) => message.kind === "assistant");
+    }
+
+    function pendingMessagesForRender(key, transcriptMessages) {
+      const pending = state.pendingMessages[key] || [];
+      return pending.filter((message) => {
+        if (message.pendingUser) return !transcriptHasMessage(transcriptMessages, "user", message.text);
+        if (message.pendingThinking) return !transcriptHasAssistantAfterUser(transcriptMessages, message.userText);
+        return true;
+      });
+    }
+
+    function reconcilePendingMessages(key) {
+      const pending = state.pendingMessages[key] || [];
+      if (!pending.length) return;
+      const transcriptMessages = detailVisibleMessages(true);
+      const next = pendingMessagesForRender(key, transcriptMessages);
+      if (next.length !== pending.length) {
+        state.pendingMessages = { ...state.pendingMessages, [key]: next };
+      }
+    }
+
+    function addPendingCodexTurn(key, text, assistantLabel = "Codex") {
+      const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      state.pendingMessages = {
+        ...state.pendingMessages,
+        [key]: [
+          ...(state.pendingMessages[key] || []),
+          { id, kind: "user", label: "You", text, pending: true, pendingUser: true },
+          { id, kind: "assistant", label: assistantLabel, text: "Thinking", userText: text, pending: true, pendingThinking: true },
+        ],
+      };
+    }
+
+    function removePendingCodexTurn(key, text) {
+      const target = normalizeMessageText(text);
+      const pending = state.pendingMessages[key] || [];
+      state.pendingMessages = {
+        ...state.pendingMessages,
+        [key]: pending.filter((message) => normalizeMessageText(message.userText || message.text) !== target),
+      };
+    }
+
+    function findSessionByKey(key) {
+      for (const host of state.hosts || []) {
+        const session = (host.sessions || []).find((row) => row.key === key);
+        if (session) return { host, session };
+      }
+      return null;
+    }
+
+    function renderChatMessages(messages) {
+      return messages.map((message) => renderChatMessage(message.kind, message.label, message.text, {
+        pending: message.pending,
+        thinking: message.pendingThinking,
+      })).join("");
+    }
+
+    function renderDetailMessages(session, options = {}) {
+      const visibleMessages = detailVisibleMessages(Boolean(options.chronological));
+      const pendingMessages = pendingMessagesForRender(session.key, visibleMessages);
+      const chatMessages = [...visibleMessages, ...pendingMessages];
+      const messages = state.detailLoading
+        ? (
+            chatMessages.length
+              ? renderChatMessages(chatMessages)
+              : renderChatMessage("system", "Timeline", "Loading recent conversation...", { expanded: true })
+          )
+        : state.detailError
+          ? (
+              chatMessages.length
+                ? renderChatMessages(chatMessages)
+                : renderChatMessage("system", "Timeline", state.detailError, { expanded: true })
+            )
+          : chatMessages.length
+            ? renderChatMessages(chatMessages)
+            : renderChatMessage("system", "Timeline", "No recent transcript events available.", { expanded: true });
+      return messages;
+    }
+
+    function scrollSessionChatToBottom() {
+      window.requestAnimationFrame(() => {
+        els.sessionChat.scrollTop = els.sessionChat.scrollHeight;
+        window.requestAnimationFrame(() => {
+          els.sessionChat.scrollTop = els.sessionChat.scrollHeight;
+        });
+      });
+    }
+
+    function approvalSignature(rows) {
+      return JSON.stringify((rows || []).map((row) => [
+        row.id,
+        row.kind,
+        row.detail,
+        row.reason,
+      ]));
+    }
+
+    function approvalRowsForSession(session) {
+      return state.approvals[session.key] || [];
+    }
+
+    function renderApprovalControls(host, session) {
+      const approvals = approvalRowsForSession(session);
+      const appServerApprovals = approvals.map((approval) => {
+        const resolving = state.approvalResolving === approval.id;
+        return `
+          <div class="approval-panel">
+            <div class="approval-title">${escapeHtml(approval.title || "Approval requested")}</div>
+            <div class="approval-detail">${escapeHtml(approval.detail || approval.kind || approval.id)}</div>
+            ${approval.reason ? `<div class="approval-reason">${escapeHtml(approval.reason)}</div>` : ""}
+            ${approval.cwd ? `<div class="approval-reason">${escapeHtml(approval.cwd)}</div>` : ""}
+            <div class="approval-actions">
+              <button class="button compact" type="button" data-approval-decision="${escapeHtml(session.key)}" data-approval-id="${escapeHtml(approval.id)}" data-decision="accept" ${resolving ? "disabled" : ""}>Allow</button>
+              <button class="button compact" type="button" data-approval-decision="${escapeHtml(session.key)}" data-approval-id="${escapeHtml(approval.id)}" data-decision="acceptForSession" ${resolving ? "disabled" : ""}>Allow Session</button>
+              <button class="button compact" type="button" data-approval-decision="${escapeHtml(session.key)}" data-approval-id="${escapeHtml(approval.id)}" data-decision="decline" ${resolving ? "disabled" : ""}>Deny</button>
+              <button class="button compact" type="button" data-approval-decision="${escapeHtml(session.key)}" data-approval-id="${escapeHtml(approval.id)}" data-decision="cancel" ${resolving ? "disabled" : ""}>Abort</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+      const screenApproval = session.screen_session && session.status === "waiting" ? `
+        <div class="approval-panel">
+          <div class="approval-title">Remote approval requested</div>
+          <div class="approval-detail">Choose an action for the active Codex menu in screen ${escapeHtml(session.screen_session)}.</div>
+          <div class="approval-actions">
+            <button class="button compact" type="button" data-session-screen-key="${escapeHtml(session.key)}" data-screen-action="accept" ${state.screenSending === session.key ? "disabled" : ""}>Allow</button>
+            <button class="button compact" type="button" data-session-screen-key="${escapeHtml(session.key)}" data-screen-action="acceptForSession" ${state.screenSending === session.key ? "disabled" : ""}>Allow Session</button>
+            <button class="button compact" type="button" data-session-screen-key="${escapeHtml(session.key)}" data-screen-action="decline" ${state.screenSending === session.key ? "disabled" : ""}>Deny</button>
+            <button class="button compact" type="button" data-session-screen-key="${escapeHtml(session.key)}" data-screen-action="cancel" ${state.screenSending === session.key ? "disabled" : ""}>Abort</button>
+          </div>
+          <details class="approval-detail">
+            <summary>Manual keys</summary>
+            <div class="approval-actions">
+              <button class="button compact" type="button" data-session-screen-key="${escapeHtml(session.key)}" data-screen-action="enter" ${state.screenSending === session.key ? "disabled" : ""}>Enter</button>
+              <button class="button compact" type="button" data-session-screen-key="${escapeHtml(session.key)}" data-screen-action="up" ${state.screenSending === session.key ? "disabled" : ""}>Up</button>
+              <button class="button compact" type="button" data-session-screen-key="${escapeHtml(session.key)}" data-screen-action="down" ${state.screenSending === session.key ? "disabled" : ""}>Down</button>
+              <button class="button compact" type="button" data-session-screen-key="${escapeHtml(session.key)}" data-screen-action="escape" ${state.screenSending === session.key ? "disabled" : ""}>Esc</button>
+              <button class="button compact" type="button" data-session-screen-key="${escapeHtml(session.key)}" data-screen-action="ctrl_c" ${state.screenSending === session.key ? "disabled" : ""}>Ctrl-C</button>
+            </div>
+          </details>
+        </div>
+      ` : "";
+      return appServerApprovals + screenApproval;
+    }
+
+    function renderSessionControls(host, session) {
+      const key = session.key;
+      const isLocal = session.host_id === "local";
+      const screenValue = state.screenInputs[key] || "";
+      const screenStatus = state.screenStatus[key] || "";
+      const screenOptions = Array.isArray(host.screen_sessions) ? host.screen_sessions : [];
+      const assignment = screenOptions.length ? `
+        <select class="field" data-session-screen-select="${escapeHtml(key)}" ${state.screenAssigning === key ? "disabled" : ""}>
+          <option value="">No screen assigned</option>
+          ${screenOptions.map((screen) => {
+            const value = screen.screen_session || "";
+            const label = [screen.name || value, screen.state, screen.cwd].filter(Boolean).join(" | ");
+            return `<option value="${escapeHtml(value)}" ${value && value === session.screen_session ? "selected" : ""}>${escapeHtml(label || value)}</option>`;
+          }).join("")}
+        </select>
+      ` : "";
+      if (session.screen_session) {
+        return `
+          ${renderApprovalControls(host, session)}
+          <textarea class="field" data-session-screen-input="${escapeHtml(key)}" placeholder="Message screen ${escapeHtml(session.screen_session)}">${escapeHtml(screenValue)}</textarea>
+          <button class="button" type="button" data-session-screen-send="${escapeHtml(key)}" ${state.screenSending === key ? "disabled" : ""}>
+            ${state.screenSending === key ? "Sending" : "Send"}
+          </button>
+          ${assignment}
+          <div class="screen-status">${escapeHtml(screenStatus || `screen ${session.screen_session}`)}</div>
+        `;
+      }
+      if (isLocal && session.tmux_pane) {
+        return `
+          ${renderApprovalControls(host, session)}
+          <textarea class="field" data-session-local-input="${escapeHtml(key)}" placeholder="Message local tmux ${escapeHtml(session.tmux_pane)}">${escapeHtml(screenValue)}</textarea>
+          <button class="button" type="button" data-session-local-send="${escapeHtml(key)}" ${state.screenSending === key ? "disabled" : ""}>
+            ${state.screenSending === key ? "Sending" : "Send"}
+          </button>
+          <div class="screen-status">${escapeHtml(screenStatus || `tmux ${session.tmux_pane}`)}</div>
+        `;
+      }
+      if (isLocal && session.platform === "codex" && session.session_id) {
+        return `
+          ${renderApprovalControls(host, session)}
+          <textarea class="field" data-session-local-codex-input="${escapeHtml(key)}" placeholder="Message local Codex">${escapeHtml(screenValue)}</textarea>
+          <button class="button" type="button" data-session-local-codex-send="${escapeHtml(key)}" ${state.screenSending === key ? "disabled" : ""}>
+            ${state.screenSending === key ? "Running" : "Send"}
+          </button>
+          <div class="screen-status">${escapeHtml(screenStatus || "Runs codex exec resume for this local session, then refreshes the transcript.")}</div>
+        `;
+      }
+      if (isLocal && session.resume_command) {
+        return `
+          <div class="screen-status">${escapeHtml(screenStatus || "This local conversation is not attached to tmux yet.")}</div>
+          <button class="button" type="button" data-session-local-resume="${escapeHtml(key)}" ${state.screenSending === key ? "disabled" : ""}>
+            ${state.screenSending === key ? "Opening" : "Open Local Resume"}
+          </button>
+        `;
+      }
+      return `
+        ${renderApprovalControls(host, session)}
+        ${assignment}
+        <textarea class="field" disabled placeholder="No interactive terminal assigned"></textarea>
+        <button class="button" type="button" disabled>Send</button>
+        <div class="screen-status">${escapeHtml(screenStatus || "Select the screen that owns this conversation before sending.")}</div>
+      `;
+    }
+
+    function renderSessionPage() {
+      const key = state.routeSessionKey;
+      const found = findSessionByKey(key);
+      els.sessionPage.classList.toggle("open", Boolean(key));
+      if (!key) {
+        els.sessionHead.innerHTML = "";
+        els.sessionChat.innerHTML = "";
+        els.sessionComposer.innerHTML = "";
+        return;
+      }
+      if (!found) {
+        els.sessionHead.innerHTML = `
+          <button class="button" type="button" data-session-back>Back</button>
+          <div class="session-title">
+            <div class="primary">Session not found</div>
+            <div class="mini">${escapeHtml(key)}</div>
+          </div>
+          <button class="button" type="button" data-session-refresh>Refresh</button>
+        `;
+        els.sessionChat.innerHTML = `<div class="session-empty">This session is not in the current snapshot.</div>`;
+        els.sessionComposer.innerHTML = "";
+        return;
+      }
+      const { host, session } = found;
+      const accent = hostAccent(host.host_id);
+      const title = sessionTitle(host, session);
+      const terminal = session.screen_session
+        ? `screen ${session.screen_session}`
+        : [session.tmux_session, session.tmux_window, session.tmux_pane].filter(Boolean).join(":") || session.tty || "";
+      const meta = [
+        display(host.host_label, host.host_id),
+        display(session.status),
+        display(session.project_name || session.cwd),
+        terminal,
+      ].filter((value) => value && value !== "-").join(" | ");
+      els.sessionHead.innerHTML = `
+        <button class="button" type="button" data-session-back>Back</button>
+        <div class="session-title" style="--host-accent: ${escapeHtml(accent)}">
+          <div class="host-title">
+            <span class="host-dot" aria-hidden="true"></span>
+            <span class="primary">${escapeHtml(title)}</span>
+          </div>
+          <div class="mini">${escapeHtml(meta || session.key)}</div>
+        </div>
+        <button class="button" type="button" data-session-refresh ${state.loading || state.refreshing ? "disabled" : ""}>Refresh</button>
+      `;
+      els.sessionChat.style.setProperty("--host-accent", accent);
+      const wasEmpty = !els.sessionChat.innerHTML;
+      const distanceFromBottom = els.sessionChat.scrollHeight - els.sessionChat.scrollTop - els.sessionChat.clientHeight;
+      const wasNearBottom = wasEmpty || distanceFromBottom <= 96;
+      els.sessionChat.innerHTML = renderDetailMessages(session, { chronological: true });
+      if (wasNearBottom) {
+        scrollSessionChatToBottom();
+      }
+      els.sessionComposer.innerHTML = renderSessionControls(host, session);
+    }
+
+    function renderDetails(host, session, accent) {
+      if (state.detailKey !== session.key) return "";
+      const screenValue = state.screenInputs[session.key] || "";
+      const screenStatus = state.screenStatus[session.key] || "";
+      const isLocal = session.host_id === "local";
+      const screenOptions = Array.isArray(host.screen_sessions) ? host.screen_sessions : [];
+      const screenAssignment = screenOptions.length ? `
+        <div class="screen-assignment">
+          <select class="field" data-screen-select="${escapeHtml(session.key)}" ${state.screenAssigning === session.key ? "disabled" : ""}>
+            <option value="">No screen assigned</option>
+            ${screenOptions.map((screen) => {
+              const value = screen.screen_session || "";
+              const label = [
+                screen.name || value,
+                screen.state,
+                screen.cwd,
+              ].filter(Boolean).join(" | ");
+              return `<option value="${escapeHtml(value)}" ${value && value === session.screen_session ? "selected" : ""}>${escapeHtml(label || value)}</option>`;
+            }).join("")}
+          </select>
+          <div class="screen-status">${escapeHtml(screenStatus || (session.screen_session ? `assigned ${session.screen_session}` : "Select the screen that owns this conversation."))}</div>
+        </div>
+      ` : "";
+      const screenControl = session.screen_session ? `
+        <div class="screen-control">
+          <textarea class="field" data-screen-input="${escapeHtml(session.key)}" placeholder="Send to screen ${escapeHtml(session.screen_session)}">${escapeHtml(screenValue)}</textarea>
+          <button class="button" type="button" data-screen-send="${escapeHtml(session.key)}" ${state.screenSending === session.key ? "disabled" : ""}>
+            ${state.screenSending === session.key ? "Sending" : "Send"}
+          </button>
+          <div class="screen-status">${escapeHtml(screenStatus || `screen ${session.screen_session}`)}</div>
+        </div>
+      ` : "";
+      const localTmuxControl = isLocal && session.tmux_pane ? `
+        <div class="screen-control">
+          <textarea class="field" data-local-input="${escapeHtml(session.key)}" placeholder="Send to local tmux ${escapeHtml(session.tmux_pane)}">${escapeHtml(screenValue)}</textarea>
+          <button class="button" type="button" data-local-send="${escapeHtml(session.key)}" ${state.screenSending === session.key ? "disabled" : ""}>
+            ${state.screenSending === session.key ? "Sending" : "Send"}
+          </button>
+          <div class="screen-status">${escapeHtml(screenStatus || `tmux ${session.tmux_pane}`)}</div>
+        </div>
+      ` : "";
+      const localResumeControl = isLocal && session.resume_command ? `
+        <div class="screen-control">
+          <div class="screen-status">${escapeHtml(screenStatus || "Open a local terminal and resume this conversation.")}</div>
+          <button class="button" type="button" data-local-resume="${escapeHtml(session.key)}" ${state.screenSending === session.key ? "disabled" : ""}>
+            ${state.screenSending === session.key ? "Opening" : "Open Local Resume"}
+          </button>
+        </div>
+      ` : "";
+      return `
+        <tr class="detail-row">
+          <td colspan="6">
+            <div class="conversation" style="--host-accent: ${escapeHtml(accent)}">
+              <div class="chat-transcript">
+                ${renderDetailMessages(session)}
+              </div>
+              ${screenAssignment}
+              ${screenControl}
+              ${localTmuxControl}
+              ${localResumeControl}
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function sessionText(host, session) {
+      return [
+        host.host_id,
+        host.host_label,
+        session.key,
+        session.platform,
+        session.source,
+        session.status,
+        session.confidence,
+        session.session_id,
+        session.cwd,
+        session.project_name,
+        session.last_event,
+        session.last_prompt,
+        session.last_response,
+        session.model,
+        session.pid,
+        session.tty,
+        session.tmux_session,
+        session.tmux_window,
+        session.tmux_pane,
+        session.screen_session,
+        session.transcript_path,
+        session.resume_command,
+      ].join(" ").toLowerCase();
+    }
+
+    function filteredSessions(host) {
+      const query = state.query.trim().toLowerCase();
+      return (host.sessions || []).filter((session) => {
+        if (state.status && session.status !== state.status) return false;
+        if (!query) return true;
+        return sessionText(host, session).includes(query);
+      });
+    }
+
+    function visibleHosts() {
+      return state.hosts.map((host) => ({
+        ...host,
+        visibleSessions: filteredSessions(host),
+      })).filter((host) => {
+        return host.visibleSessions.length || !state.query && !state.status || (host.errors || []).length;
+      });
+    }
+
+    function renderCounts() {
+      const items = [
+        ["total", state.counts.total || 0],
+        ["running", state.counts.running || 0],
+        ["waiting", state.counts.waiting || 0],
+        ["idle", state.counts.idle || 0],
+        ["stale", state.counts.stale || 0],
+        ["errors", state.hosts.reduce((sum, host) => sum + (host.errors || []).length, 0)],
+      ];
+
+      els.counts.innerHTML = items.map(([label, value]) => `
+        <div class="metric">
+          <div class="metric-label">${escapeHtml(label)}</div>
+          <div class="metric-value">${escapeHtml(value)}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderAddPanel() {
+      els.addPanel.classList.toggle("open", state.addOpen);
+      els.toggleAdd.textContent = state.addOpen ? "Close" : "Servers";
+      els.hostId.disabled = Boolean(state.editingHostId);
+      els.saveHost.disabled = state.savingHost;
+      els.saveHost.textContent = state.savingHost ? "Saving" : state.editingHostId ? "Update Host" : "Save Host";
+      els.cancelEdit.hidden = !state.editingHostId;
+      els.hostList.innerHTML = state.configuredHosts.length ? state.configuredHosts.map((host) => {
+        const isLocal = host.id === "local" || host.type === "local";
+        const password = host.has_password ? "password saved" : "no password";
+        const actions = host.enable_actions ? "actions enabled" : "actions disabled";
+        return `
+          <div class="configured-host">
+            <div>
+              <div class="configured-title">${escapeHtml(host.label || host.id)}</div>
+              <div class="configured-sub">${escapeHtml([host.id, host.ssh || "local", password, actions].filter(Boolean).join(" | "))}</div>
+            </div>
+            <div class="row-actions">
+              <button class="button compact" type="button" data-edit-host="${escapeHtml(host.id)}" ${isLocal ? "disabled" : ""}>Edit</button>
+              <button class="button compact" type="button" data-delete-host="${escapeHtml(host.id)}" ${isLocal || state.deletingHost === host.id ? "disabled" : ""}>
+                ${state.deletingHost === host.id ? "Deleting" : "Delete"}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("") : `<div class="candidate-sub">No configured hosts loaded.</div>`;
+      els.candidateList.innerHTML = state.candidates.map((host) => `
+        <div class="candidate">
+          <div>
+            <div class="candidate-title">${escapeHtml(host.label || host.id || host.ssh)}</div>
+            <div class="candidate-sub">${escapeHtml(host.ssh || "")}${host.configured ? " | configured" : ""}</div>
+          </div>
+          <button class="button compact" type="button" data-candidate="${escapeHtml(host.id || "")}" ${host.configured ? "disabled" : ""}>Use</button>
+        </div>
+      `).join("");
+    }
+
+    function configuredHostById(id) {
+      return state.configuredHosts.find((host) => host.id === id) || null;
+    }
+
+    function sshBasePathSuggestions(config) {
+      const suggestions = ["~"];
+      if (!config || !config.ssh) return suggestions;
+      const target = splitSshTarget(config.ssh).ssh;
+      const userPart = target.includes("@") ? target.split("@", 1)[0] : "";
+      if (userPart && userPart !== "root") suggestions.push(`/home/${userPart}`);
+      if (userPart === "root") suggestions.push("/root");
+      suggestions.push("/volumes/home", "/workspace", "/mnt", "/data");
+      return suggestions;
+    }
+
+    function remotePathSuggestions(host) {
+      if (!host) return ["~"];
+      const config = configuredHostById(host.host_id);
+      const values = new Set();
+      const addPath = (value) => {
+        const text = String(value || "").trim();
+        if (!text) return;
+        values.add(text);
+      };
+      addPath(config && config.root);
+      sshBasePathSuggestions(config).forEach(addPath);
+      (host.sessions || []).forEach((session) => {
+        addPath(session.cwd);
+        if (session.cwd && session.project_name) {
+          addPath(session.cwd.replace(new RegExp(`/${escapeRegExp(session.project_name)}$`), ""));
+        }
+      });
+      (host.screen_sessions || []).forEach((screen) => addPath(screen.cwd));
+      return Array.from(values).slice(0, 30);
+    }
+
+    function escapeRegExp(value) {
+      return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function renderNewSession() {
+      const remoteHosts = state.hosts.filter((host) => host.host_id !== "local");
+      if (!state.newSessionHost && remoteHosts.length) {
+        state.newSessionHost = remoteHosts[0].host_id || "";
+      }
+      els.newHost.innerHTML = remoteHosts.length
+        ? remoteHosts.map((host) => {
+            const value = host.host_id || "";
+            const label = host.host_label || host.host_id || "remote";
+            return `<option value="${escapeHtml(value)}" ${value === state.newSessionHost ? "selected" : ""}>${escapeHtml(label)}</option>`;
+          }).join("")
+        : `<option value="">No remote hosts</option>`;
+      const selectedHost = remoteHosts.find((host) => host.host_id === state.newSessionHost) || remoteHosts[0] || null;
+      const cwdOptions = remotePathSuggestions(selectedHost);
+      els.newCwdOptions.innerHTML = cwdOptions.map((path) => `<option value="${escapeHtml(path)}"></option>`).join("");
+      els.newHost.disabled = state.startingSession || !remoteHosts.length;
+      els.newCwd.value = state.newSessionCwd;
+      els.newScreen.value = state.newSessionScreen;
+      els.newCwd.disabled = state.startingSession || !remoteHosts.length;
+      els.newScreen.disabled = state.startingSession || !remoteHosts.length;
+      els.newSession.disabled = state.startingSession || !remoteHosts.length;
+      els.newSession.textContent = state.startingSession ? "Starting" : "New Codex";
+      if (state.startSessionStatus && !state.error) {
+        els.message.hidden = false;
+        els.message.className = "state";
+        els.message.textContent = state.startSessionStatus;
+      }
+    }
+
+    function renderMessage(hosts) {
+      els.message.className = `state${state.error ? " error" : ""}`;
+      if (state.error) {
+        els.message.hidden = false;
+        els.message.textContent = state.error;
+        return;
+      }
+      if (state.loading && !state.loadedAt) {
+        els.message.hidden = false;
+        els.message.textContent = "Loading snapshot...";
+        return;
+      }
+      if (!state.hosts.length) {
+        els.message.hidden = false;
+        els.message.textContent = "No hosts returned by the snapshot API.";
+        return;
+      }
+      if (!hosts.length) {
+        els.message.hidden = false;
+        els.message.textContent = "No sessions match the current filters.";
+        return;
+      }
+      els.message.hidden = true;
+    }
+
+    function renderHosts(hosts) {
+      const hostErrors = hosts.flatMap((host) => (host.errors || []).map((error) => `
+        <div class="host-error">
+          <strong>${escapeHtml(host.host_label || host.host_id)} / ${escapeHtml(error.kind || "collector_error")}:</strong>
+          ${escapeHtml(error.message || "Unknown collector error")}
+        </div>
+      `)).join("");
+
+      const rows = hosts.flatMap((host) => {
+        return host.visibleSessions.map((session) => ({ host, session }));
+      }).sort((left, right) => {
+        const leftTime = left.session.transcript_mtime_ms || left.host.collected_at_ms || 0;
+        const rightTime = right.session.transcript_mtime_ms || right.host.collected_at_ms || 0;
+        return rightTime - leftTime;
+      }).map(({ host, session }) => {
+        const accent = hostAccent(host.host_id);
+        const title = display(session.last_prompt || session.last_response || session.last_event);
+        const agent = `${display(session.platform)} / ${display(session.source)}`;
+        const project = display(session.project_name || session.cwd);
+        const sessionId = display(session.session_id || session.key);
+        const terminal = session.screen_session
+          ? `screen ${session.screen_session}`
+          : [session.tmux_session, session.tmux_window, session.tmux_pane].filter(Boolean).join(":") || session.tty || "";
+        const process = session.pid ? `pid ${session.pid}` : "";
+        const meta = [session.model, terminal, process].filter(Boolean).join(" | ");
+        const copied = state.copied === session.key ? " copied" : "";
+        const resume = session.resume_command || "";
+
+        return `
+          <tr>
+            <td class="col-status" data-label="Status">
+              <span class="status ${escapeHtml(session.status || "")}">${escapeHtml(display(session.status))}</span>
+              <div class="confidence">${escapeHtml(display(session.confidence, "confidence unknown"))}</div>
+            </td>
+            <td class="col-host" data-label="Host">
+              <div class="host-title" style="--host-accent: ${escapeHtml(accent)}">
+                <span class="host-dot" aria-hidden="true"></span>
+                <span class="host-name">${escapeHtml(display(host.host_label, host.host_id))}</span>
+              </div>
+              <div class="mini">${escapeHtml(host.host_id || "")}</div>
+            </td>
+            <td class="col-agent" data-label="Agent">
+              <div class="primary" title="${escapeHtml(agent)}">${escapeHtml(agent)}</div>
+              <div class="mini" title="${escapeHtml(meta)}">${escapeHtml(meta || "no process detail")}</div>
+            </td>
+            <td class="col-session" data-label="Session">
+              <div class="primary" title="${escapeHtml(project)}">${escapeHtml(project)}</div>
+              <div class="mini" title="${escapeHtml(sessionId)}">${escapeHtml(sessionId)}</div>
+            </td>
+            <td class="col-activity" data-label="Activity">
+              <div class="activity" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+              <div class="mini" title="${escapeHtml(session.cwd || session.transcript_path || "")}">
+                ${escapeHtml(session.cwd || session.transcript_path || "no path")}
+              </div>
+            </td>
+            <td class="col-resume" data-label="Resume">
+              <button class="button compact" type="button" data-detail="${escapeHtml(session.key)}">
+                Open
+              </button>
+              <button class="button compact${copied}" type="button" data-copy="${escapeHtml(resume)}" data-key="${escapeHtml(session.key)}" ${resume ? "" : "disabled"}>
+                ${copied ? "Copied" : "Copy"}
+              </button>
+            </td>
+          </tr>
+          ${renderDetails(host, session, accent)}
+        `;
+      }).join("");
+
+      const table = rows ? `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-status">Status</th>
+                <th class="col-host">Host</th>
+                <th class="col-agent">Platform / source</th>
+                <th class="col-session">Project / session</th>
+                <th class="col-activity">Latest activity</th>
+                <th class="col-resume">Resume</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      ` : `<div class="empty-host">No sessions match the current filters.</div>`;
+
+      els.hosts.innerHTML = `
+        ${hostErrors ? `<div class="host-errors">${hostErrors}</div>` : ""}
+        ${table}
+      `;
+    }
+
+    function render() {
+      const hosts = visibleHosts();
+      const onSessionPage = Boolean(state.routeSessionKey);
+      document.body.classList.toggle("session-route", onSessionPage);
+      els.topbar.hidden = onSessionPage;
+      els.counts.hidden = onSessionPage;
+      els.controls.hidden = onSessionPage;
+      els.newSessionPanel.hidden = onSessionPage;
+      els.hosts.hidden = onSessionPage;
+      els.addPanel.hidden = onSessionPage;
+      renderCounts();
+      renderAddPanel();
+      renderMessage(hosts);
+      if (onSessionPage && !state.error) els.message.hidden = true;
+      renderNewSession();
+      renderHosts(hosts);
+      renderSessionPage();
+      els.refresh.disabled = state.loading || state.refreshing;
+      els.refresh.textContent = state.loading ? "Refreshing" : "Refresh";
+      els.updated.textContent = state.loadedAt ? `Updated ${state.loadedAt.toLocaleTimeString()}` : "Not loaded";
+      els.notifyCompleted.checked = state.notifyCompleted;
+    }
+
+    async function copyText(text, key) {
+      if (!text) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const area = document.createElement("textarea");
+          area.value = text;
+          area.style.position = "fixed";
+          area.style.left = "-9999px";
+          document.body.appendChild(area);
+          area.focus();
+          area.select();
+          document.execCommand("copy");
+          area.remove();
+        }
+        state.copied = key;
+        render();
+        window.setTimeout(() => {
+          if (state.copied === key) {
+            state.copied = "";
+            render();
+          }
+        }, 1400);
+      } catch (error) {
+        state.error = `Could not copy resume command: ${error.message}`;
+        render();
+      }
+    }
+
+    async function load({ refresh = false, quiet = false } = {}) {
+      if (state.loading || state.refreshing) return;
+      state.loading = !quiet;
+      state.refreshing = quiet;
+      if (!quiet) state.error = "";
+      render();
+      try {
+        const response = await fetch(apiUrl(refresh), { headers: { "Accept": "application/json" } });
+        if (!response.ok) throw new Error(`Snapshot request failed with HTTP ${response.status}`);
+        const data = await response.json();
+        const hosts = Array.isArray(data.hosts) ? data.hosts : [];
+        detectCompletedSessions(hosts);
+        state.hosts = hosts;
+        state.counts = data.counts || {};
+        state.loadedAt = new Date();
+        state.error = "";
+      } catch (error) {
+        if (!quiet) state.error = `Unable to load /agent-console/api/snapshot. ${error.message}`;
+      } finally {
+        state.loading = false;
+        state.refreshing = false;
+        render();
+      }
+    }
+
+    async function loadCandidates() {
+      state.addOpen = true;
+      render();
+      try {
+        const response = await fetch(apiUrl(false, "/api/vscode-hosts"), { headers: { "Accept": "application/json" } });
+        if (!response.ok) throw new Error(`Host discovery failed with HTTP ${response.status}`);
+        const data = await response.json();
+        state.candidates = Array.isArray(data.hosts) ? data.hosts : [];
+      } catch (error) {
+        state.error = `Unable to load VS Code SSH hosts. ${error.message}`;
+      }
+      render();
+    }
+
+    async function loadConfiguredHosts(openPanel = true) {
+      if (openPanel) state.addOpen = true;
+      render();
+      try {
+        const response = await fetch(apiUrl(false, "/api/hosts"), { headers: { "Accept": "application/json" } });
+        if (!response.ok) throw new Error(`Host list failed with HTTP ${response.status}`);
+        const data = await response.json();
+        state.configuredHosts = Array.isArray(data.hosts) ? data.hosts : [];
+      } catch (error) {
+        state.error = `Unable to load configured hosts. ${error.message}`;
+      }
+      render();
+    }
+
+    function resetHostForm() {
+      state.editingHostId = "";
+      els.hostId.value = "";
+      els.hostLabel.value = "";
+      els.hostSsh.value = "";
+      els.hostPort.value = "";
+      els.hostPassword.value = "";
+      els.hostActions.checked = false;
+      render();
+    }
+
+    function editHost(id) {
+      const host = state.configuredHosts.find((row) => row.id === id);
+      if (!host || host.id === "local" || host.type === "local") return;
+      const sshTarget = splitSshTarget(host.ssh || "");
+      state.editingHostId = host.id;
+      els.hostId.value = host.id || "";
+      els.hostLabel.value = host.label || host.id || "";
+      els.hostSsh.value = sshTarget.ssh;
+      els.hostPort.value = sshTarget.port;
+      els.hostPassword.value = "";
+      els.hostActions.checked = Boolean(host.enable_actions);
+      render();
+    }
+
+    async function deleteConfiguredHost(id) {
+      const host = state.configuredHosts.find((row) => row.id === id);
+      if (!host || host.id === "local" || host.type === "local") return;
+      if (!window.confirm(`Delete server ${host.label || host.id}? Local password and monitoring config will be removed.`)) return;
+      state.deletingHost = id;
+      render();
+      try {
+        const response = await fetch(apiUrl(false, `/api/hosts/${encodeURIComponent(id)}`), {
+          method: "DELETE",
+          headers: { "Accept": "application/json" },
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Delete failed with HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        state.configuredHosts = Array.isArray(data.hosts) ? data.hosts : [];
+        if (state.editingHostId === id) resetHostForm();
+        await load({ refresh: true });
+      } catch (error) {
+        state.error = `Unable to delete host. ${error.message}`;
+      } finally {
+        state.deletingHost = "";
+        render();
+      }
+    }
+
+    async function startRemoteCodexSession() {
+      const hostId = state.newSessionHost || els.newHost.value;
+      if (!hostId) {
+        state.error = "Choose a remote host first.";
+        render();
+        return;
+      }
+      state.startingSession = true;
+      state.startSessionStatus = "";
+      state.error = "";
+      render();
+      try {
+        const response = await fetch(apiUrl(false, `/api/hosts/${encodeURIComponent(hostId)}/screen-session`), {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cwd: state.newSessionCwd || "~",
+            screen_name: state.newSessionScreen || null,
+          }),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Start failed with HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        const screen = data.screen || {};
+        state.newSessionScreen = "";
+        state.startSessionStatus = `Started ${screen.screen_session || "remote screen"} on ${hostId}.`;
+        await new Promise((resolve) => window.setTimeout(resolve, 1200));
+        await load({ refresh: true, quiet: true });
+      } catch (error) {
+        state.error = `Unable to start remote Codex session. ${error.message}`;
+      } finally {
+        state.startingSession = false;
+        render();
+      }
+    }
+
+    async function saveHost() {
+      const port = els.hostPort.value.trim();
+      if (port && !/^\d+$/.test(port)) {
+        state.error = "Port must be numeric when provided.";
+        render();
+        return;
+      }
+      const payload = {
+        id: els.hostId.value.trim(),
+        label: els.hostLabel.value.trim() || els.hostId.value.trim(),
+        ssh: composeSshTarget(els.hostSsh.value, port),
+        password: els.hostPassword.value,
+        enable_actions: els.hostActions.checked,
+      };
+      if (!payload.id || !payload.ssh) {
+        state.error = "Host id and SSH target are required.";
+        render();
+        return;
+      }
+      state.savingHost = true;
+      state.error = "";
+      render();
+      try {
+        const response = await fetch(apiUrl(false, "/api/hosts"), {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Save failed with HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        state.configuredHosts = Array.isArray(data.hosts) ? data.hosts : [];
+        resetHostForm();
+        els.hostActions.checked = false;
+        await load({ refresh: true });
+      } catch (error) {
+        state.error = `Unable to save host. ${error.message}`;
+      } finally {
+        state.savingHost = false;
+        render();
+      }
+    }
+
+    function useCandidate(id) {
+      const host = state.candidates.find((candidate) => candidate.id === id);
+      if (!host) return;
+      const sshTarget = splitSshTarget(host.ssh || "");
+      state.editingHostId = "";
+      els.hostId.value = host.id || "";
+      els.hostLabel.value = host.label || host.id || "";
+      els.hostSsh.value = sshTarget.ssh;
+      els.hostPort.value = sshTarget.port;
+      els.hostActions.checked = false;
+      els.hostPassword.value = "";
+      els.hostPassword.focus();
+      render();
+    }
+
+    async function loadDetails(key, { quiet = false } = {}) {
+      if (state.detailLoading) return;
+      state.detailLoading = !quiet;
+      if (!quiet) state.detailError = "";
+      render();
+      try {
+        const response = await fetch(sessionUrl(key, `/timeline?limit=${DETAIL_TIMELINE_LIMIT}`), { headers: { "Accept": "application/json" } });
+        if (!response.ok) throw new Error(`Timeline request failed with HTTP ${response.status}`);
+        const data = await response.json();
+        if (state.detailKey === key) {
+          state.detailTimeline = Array.isArray(data.timeline) ? data.timeline.slice(-DETAIL_TIMELINE_LIMIT).reverse() : [];
+          state.detailError = data.error || "";
+          state.detailTerminalCapture = data.terminal_capture || "";
+          state.detailTerminalError = data.terminal_error || "";
+          reconcilePendingMessages(key);
+        }
+      } catch (error) {
+        if (!quiet && state.detailKey === key) state.detailError = error.message;
+      } finally {
+        state.detailLoading = false;
+        if (state.detailKey === key) {
+          render();
+        }
+      }
+    }
+
+    async function loadApprovals(key, { quiet = true } = {}) {
+      const found = findSessionByKey(key);
+      if (!found || found.host.host_id !== "local" || found.session.platform !== "codex") return;
+      try {
+        const response = await fetch(sessionUrl(key, "/approvals"), { headers: { "Accept": "application/json" } });
+        if (!response.ok) {
+          if (!quiet) throw new Error(`Approval request failed with HTTP ${response.status}`);
+          return;
+        }
+        const data = await response.json();
+        const approvals = Array.isArray(data.approvals) ? data.approvals : [];
+        if (approvalSignature(state.approvals[key] || []) !== approvalSignature(approvals)) {
+          state.approvals = { ...state.approvals, [key]: approvals };
+          render();
+        }
+      } catch (error) {
+        if (!quiet) {
+          state.screenStatus = { ...state.screenStatus, [key]: error.message };
+          render();
+        }
+      }
+    }
+
+    async function toggleDetails(key) {
+      if (state.detailKey === key) {
+        state.detailKey = "";
+        state.detailTimeline = [];
+        state.detailError = "";
+        state.detailTerminalCapture = "";
+        state.detailTerminalError = "";
+        render();
+        return;
+      }
+      state.detailKey = key;
+      state.detailTimeline = [];
+      state.detailError = "";
+      state.detailTerminalCapture = "";
+      state.detailTerminalError = "";
+      await loadDetails(key);
+      await loadApprovals(key);
+    }
+
+    async function openSessionPage(key) {
+      if (!key) return;
+      state.routeSessionKey = key;
+      state.detailKey = key;
+      state.detailTimeline = [];
+      state.detailError = "";
+      state.detailTerminalCapture = "";
+      state.detailTerminalError = "";
+      window.history.pushState({ sessionKey: key }, "", sessionPageUrl(key));
+      render();
+      await loadDetails(key);
+      await loadApprovals(key);
+    }
+
+    function closeSessionPage() {
+      state.routeSessionKey = "";
+      state.detailKey = "";
+      state.detailTimeline = [];
+      state.detailError = "";
+      state.detailTerminalCapture = "";
+      state.detailTerminalError = "";
+      window.history.pushState({}, "", `${appBasePath()}/`);
+      render();
+    }
+
+    function sessionPageIsBeingUsed() {
+      if (!state.routeSessionKey) return false;
+      if (els.sessionPage.contains(document.activeElement)) return true;
+      if ((state.screenInputs[state.routeSessionKey] || "").trim()) return true;
+      const chat = els.sessionChat;
+      if (!chat) return false;
+      const distanceFromBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight;
+      return distanceFromBottom > 96;
+    }
+
+    async function autoRefresh() {
+      if (document.hidden || state.savingHost || state.screenSending || state.screenAssigning) return;
+      if (sessionPageIsBeingUsed()) return;
+      await load({ refresh: true, quiet: true });
+      if (state.detailKey) await loadDetails(state.detailKey, { quiet: true });
+      if (state.detailKey) await loadApprovals(state.detailKey, { quiet: true });
+    }
+
+    async function sendScreenInput(key) {
+      const text = state.screenInputs[key] || "";
+      if (!text.trim()) {
+        state.screenStatus = { ...state.screenStatus, [key]: "Type a message before sending." };
+        render();
+        return;
+      }
+      const sentText = text.trim();
+      addPendingCodexTurn(key, sentText, "Screen");
+      state.screenInputs = { ...state.screenInputs, [key]: "" };
+      state.screenSending = key;
+      state.screenStatus = { ...state.screenStatus, [key]: "Sending to screen..." };
+      render();
+      if (state.detailKey === key) scrollSessionChatToBottom();
+      try {
+        const response = await fetch(sessionUrl(key, "/screen-input"), {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ text: sentText }),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Screen input failed with HTTP ${response.status}`);
+        }
+        state.screenStatus = { ...state.screenStatus, [key]: "Sent to screen. Waiting for screen update." };
+        if (state.detailKey === key) window.setTimeout(() => loadDetails(key, { quiet: true }), 700);
+        if (state.detailKey === key) window.setTimeout(() => loadDetails(key, { quiet: true }), 2200);
+      } catch (error) {
+        removePendingCodexTurn(key, sentText);
+        if (!(state.screenInputs[key] || "").trim()) {
+          state.screenInputs = { ...state.screenInputs, [key]: sentText };
+        }
+        state.screenStatus = { ...state.screenStatus, [key]: error.message };
+      } finally {
+        state.screenSending = "";
+        render();
+      }
+    }
+
+    async function sendLocalInput(key) {
+      const text = state.screenInputs[key] || "";
+      if (!text.trim()) {
+        state.screenStatus = { ...state.screenStatus, [key]: "Type a message before sending." };
+        render();
+        return;
+      }
+      state.screenSending = key;
+      state.screenStatus = { ...state.screenStatus, [key]: "" };
+      render();
+      try {
+        const response = await fetch(sessionUrl(key, "/local-input"), {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Local input failed with HTTP ${response.status}`);
+        }
+        state.screenInputs = { ...state.screenInputs, [key]: "" };
+        state.screenStatus = { ...state.screenStatus, [key]: "Sent to local tmux." };
+        if (state.detailKey === key) {
+          window.setTimeout(() => loadDetails(key, { quiet: true }), 1200);
+        }
+      } catch (error) {
+        state.screenStatus = { ...state.screenStatus, [key]: error.message };
+      } finally {
+        state.screenSending = "";
+        render();
+      }
+    }
+
+    async function sendLocalCodexPrompt(key) {
+      const text = state.screenInputs[key] || "";
+      if (!text.trim()) {
+        state.screenStatus = { ...state.screenStatus, [key]: "Type a message before sending." };
+        render();
+        return;
+      }
+      const sentText = text.trim();
+      addPendingCodexTurn(key, sentText);
+      state.screenInputs = { ...state.screenInputs, [key]: "" };
+      state.screenSending = key;
+      state.screenStatus = { ...state.screenStatus, [key]: "Codex is thinking..." };
+      render();
+      if (state.detailKey === key) scrollSessionChatToBottom();
+      try {
+        const response = await fetch(sessionUrl(key, "/local-codex-prompt"), {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ text: sentText }),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Local Codex prompt failed with HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        state.screenStatus = {
+          ...state.screenStatus,
+          [key]: data.mode === "app-server"
+            ? "Sent to Codex. Waiting for transcript update."
+            : "Local Codex response completed.",
+        };
+        window.setTimeout(() => load({ refresh: true, quiet: true }), 300);
+        window.setTimeout(() => loadApprovals(key, { quiet: true }), 500);
+        if (state.detailKey === key) window.setTimeout(() => loadDetails(key, { quiet: true }), 700);
+        window.setTimeout(() => loadApprovals(key, { quiet: true }), 1800);
+        if (state.detailKey === key) window.setTimeout(() => loadDetails(key, { quiet: true }), 2200);
+      } catch (error) {
+        removePendingCodexTurn(key, sentText);
+        if (!(state.screenInputs[key] || "").trim()) {
+          state.screenInputs = { ...state.screenInputs, [key]: sentText };
+        }
+        state.screenStatus = { ...state.screenStatus, [key]: error.message };
+      } finally {
+        state.screenSending = "";
+        render();
+      }
+    }
+
+    async function resolveApproval(key, approvalId, decision) {
+      state.approvalResolving = approvalId;
+      state.screenStatus = { ...state.screenStatus, [key]: "Sending approval decision..." };
+      render();
+      try {
+        const response = await fetch(sessionUrl(key, `/approvals/${encodeURIComponent(approvalId)}`), {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ decision }),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Approval failed with HTTP ${response.status}`);
+        }
+        const approvals = state.approvals[key] || [];
+        state.approvals = { ...state.approvals, [key]: approvals.filter((row) => row.id !== approvalId) };
+        state.screenStatus = { ...state.screenStatus, [key]: "Approval decision sent." };
+        window.setTimeout(() => loadApprovals(key, { quiet: true }), 500);
+        if (state.detailKey === key) window.setTimeout(() => loadDetails(key, { quiet: true }), 800);
+      } catch (error) {
+        state.screenStatus = { ...state.screenStatus, [key]: error.message };
+      } finally {
+        state.approvalResolving = "";
+        render();
+      }
+    }
+
+    async function sendScreenKey(key, action) {
+      state.screenSending = key;
+      state.screenStatus = { ...state.screenStatus, [key]: `Sending ${action} to screen...` };
+      render();
+      try {
+        const response = await fetch(sessionUrl(key, "/screen-key"), {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Screen key failed with HTTP ${response.status}`);
+        }
+        state.screenStatus = { ...state.screenStatus, [key]: `Sent ${action} to screen.` };
+        window.setTimeout(() => load({ refresh: true, quiet: true }), 400);
+        if (state.detailKey === key) window.setTimeout(() => loadDetails(key, { quiet: true }), 900);
+      } catch (error) {
+        state.screenStatus = { ...state.screenStatus, [key]: error.message };
+      } finally {
+        state.screenSending = "";
+        render();
+      }
+    }
+
+    function sendFromSessionTextarea(target) {
+      const screenKey = target.getAttribute("data-session-screen-input");
+      if (screenKey) {
+        sendScreenInput(screenKey);
+        return;
+      }
+      const localKey = target.getAttribute("data-session-local-input");
+      if (localKey) {
+        sendLocalInput(localKey);
+        return;
+      }
+      const localCodexKey = target.getAttribute("data-session-local-codex-input");
+      if (localCodexKey) {
+        sendLocalCodexPrompt(localCodexKey);
+      }
+    }
+
+    async function openLocalResume(key) {
+      state.screenSending = key;
+      state.screenStatus = { ...state.screenStatus, [key]: "" };
+      render();
+      try {
+        const response = await fetch(sessionUrl(key, "/local-resume"), {
+          method: "POST",
+          headers: { "Accept": "application/json" },
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Local resume failed with HTTP ${response.status}`);
+        }
+        state.screenStatus = { ...state.screenStatus, [key]: "Opened local resume terminal." };
+      } catch (error) {
+        state.screenStatus = { ...state.screenStatus, [key]: error.message };
+      } finally {
+        state.screenSending = "";
+        render();
+      }
+    }
+
+    function setSessionScreen(key, screenSession) {
+      state.hosts = state.hosts.map((host) => ({
+        ...host,
+        sessions: (host.sessions || []).map((session) => (
+          session.key === key ? { ...session, screen_session: screenSession || null } : session
+        )),
+      }));
+    }
+
+    async function assignScreen(key, screenSession) {
+      state.screenAssigning = key;
+      state.screenStatus = { ...state.screenStatus, [key]: "" };
+      render();
+      try {
+        const response = await fetch(sessionUrl(key, "/screen-assignment"), {
+          method: "POST",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ screen_session: screenSession }),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `Screen assignment failed with HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        setSessionScreen(key, data.screen_session || "");
+        state.screenStatus = { ...state.screenStatus, [key]: data.screen_session ? `Assigned ${data.screen_session}` : "Screen assignment cleared." };
+      } catch (error) {
+        state.screenStatus = { ...state.screenStatus, [key]: error.message };
+      } finally {
+        state.screenAssigning = "";
+        render();
+      }
+    }
+
+    els.query.addEventListener("input", (event) => {
+      state.query = event.target.value;
+      render();
+    });
+
+    els.status.addEventListener("change", (event) => {
+      state.status = event.target.value;
+      render();
+    });
+
+    els.newHost.addEventListener("change", (event) => {
+      state.newSessionHost = event.target.value;
+      render();
+    });
+
+    els.newCwd.addEventListener("input", (event) => {
+      state.newSessionCwd = event.target.value;
+    });
+
+    els.newScreen.addEventListener("input", (event) => {
+      state.newSessionScreen = event.target.value;
+    });
+
+    els.refresh.addEventListener("click", () => load({ refresh: true }));
+    els.newSession.addEventListener("click", startRemoteCodexSession);
+    els.notifyCompleted.addEventListener("change", (event) => setNotifyCompleted(event.target.checked));
+    els.testNotify.addEventListener("click", testNotification);
+    els.completionPopupClose.addEventListener("click", () => {
+      window.clearTimeout(state.completionPopupTimer);
+      els.completionPopup.classList.remove("show");
+    });
+    els.toggleAdd.addEventListener("click", () => {
+      state.addOpen = !state.addOpen;
+      render();
+      if (state.addOpen) loadConfiguredHosts();
+    });
+    els.loadCandidates.addEventListener("click", loadCandidates);
+    els.saveHost.addEventListener("click", saveHost);
+    els.cancelEdit.addEventListener("click", resetHostForm);
+    els.hostList.addEventListener("click", (event) => {
+      const editButton = event.target.closest("[data-edit-host]");
+      if (editButton) {
+        editHost(editButton.getAttribute("data-edit-host"));
+        return;
+      }
+      const deleteButton = event.target.closest("[data-delete-host]");
+      if (deleteButton) {
+        deleteConfiguredHost(deleteButton.getAttribute("data-delete-host"));
+      }
+    });
+    els.candidateList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-candidate]");
+      if (!button) return;
+      useCandidate(button.getAttribute("data-candidate"));
+    });
+
+    els.hosts.addEventListener("click", (event) => {
+      const detailButton = event.target.closest("[data-detail]");
+      if (detailButton) {
+        openSessionPage(detailButton.getAttribute("data-detail"));
+        return;
+      }
+      const screenButton = event.target.closest("[data-screen-send]");
+      if (screenButton) {
+        sendScreenInput(screenButton.getAttribute("data-screen-send"));
+        return;
+      }
+      const screenKeyButton = event.target.closest("[data-session-screen-key]");
+      if (screenKeyButton) {
+        sendScreenKey(
+          screenKeyButton.getAttribute("data-session-screen-key"),
+          screenKeyButton.getAttribute("data-screen-action")
+        );
+        return;
+      }
+      const approvalButton = event.target.closest("[data-approval-decision]");
+      if (approvalButton) {
+        resolveApproval(
+          approvalButton.getAttribute("data-approval-decision"),
+          approvalButton.getAttribute("data-approval-id"),
+          approvalButton.getAttribute("data-decision")
+        );
+        return;
+      }
+      const localButton = event.target.closest("[data-local-send]");
+      if (localButton) {
+        sendLocalInput(localButton.getAttribute("data-local-send"));
+        return;
+      }
+      const localResumeButton = event.target.closest("[data-local-resume]");
+      if (localResumeButton) {
+        openLocalResume(localResumeButton.getAttribute("data-local-resume"));
+        return;
+      }
+      const button = event.target.closest("[data-copy]");
+      if (!button) return;
+      copyText(button.getAttribute("data-copy"), button.getAttribute("data-key"));
+    });
+
+    els.hosts.addEventListener("input", (event) => {
+      const input = event.target.closest("[data-screen-input]");
+      const localInput = event.target.closest("[data-local-input]");
+      const target = input || localInput;
+      if (!target) return;
+      const key = target.getAttribute(input ? "data-screen-input" : "data-local-input");
+      state.screenInputs = { ...state.screenInputs, [key]: target.value };
+    });
+
+    els.hosts.addEventListener("change", (event) => {
+      const select = event.target.closest("[data-screen-select]");
+      if (!select) return;
+      assignScreen(select.getAttribute("data-screen-select"), select.value);
+    });
+
+    els.sessionPage.addEventListener("click", (event) => {
+      if (event.target.closest("[data-session-back]")) {
+        closeSessionPage();
+        return;
+      }
+      if (event.target.closest("[data-session-refresh]")) {
+        load({ refresh: true });
+        if (state.detailKey) loadDetails(state.detailKey, { quiet: true });
+        if (state.detailKey) loadApprovals(state.detailKey, { quiet: true });
+        return;
+      }
+      const screenButton = event.target.closest("[data-session-screen-send]");
+      if (screenButton) {
+        sendScreenInput(screenButton.getAttribute("data-session-screen-send"));
+        return;
+      }
+      const screenKeyButton = event.target.closest("[data-session-screen-key]");
+      if (screenKeyButton) {
+        sendScreenKey(
+          screenKeyButton.getAttribute("data-session-screen-key"),
+          screenKeyButton.getAttribute("data-screen-action")
+        );
+        return;
+      }
+      const approvalButton = event.target.closest("[data-approval-decision]");
+      if (approvalButton) {
+        resolveApproval(
+          approvalButton.getAttribute("data-approval-decision"),
+          approvalButton.getAttribute("data-approval-id"),
+          approvalButton.getAttribute("data-decision")
+        );
+        return;
+      }
+      const localButton = event.target.closest("[data-session-local-send]");
+      if (localButton) {
+        sendLocalInput(localButton.getAttribute("data-session-local-send"));
+        return;
+      }
+      const localCodexButton = event.target.closest("[data-session-local-codex-send]");
+      if (localCodexButton) {
+        sendLocalCodexPrompt(localCodexButton.getAttribute("data-session-local-codex-send"));
+        return;
+      }
+      const localResumeButton = event.target.closest("[data-session-local-resume]");
+      if (localResumeButton) {
+        openLocalResume(localResumeButton.getAttribute("data-session-local-resume"));
+      }
+    });
+
+    els.sessionPage.addEventListener("input", (event) => {
+      const input = event.target.closest("[data-session-screen-input]");
+      const localInput = event.target.closest("[data-session-local-input]");
+      const localCodexInput = event.target.closest("[data-session-local-codex-input]");
+      const target = input || localInput || localCodexInput;
+      if (!target) return;
+      const key = target.getAttribute(
+        input
+          ? "data-session-screen-input"
+          : localInput
+            ? "data-session-local-input"
+            : "data-session-local-codex-input"
+      );
+      state.screenInputs = { ...state.screenInputs, [key]: target.value };
+    });
+
+    els.sessionPage.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey) return;
+      const target = event.target.closest(
+        "[data-session-screen-input], [data-session-local-input], [data-session-local-codex-input]"
+      );
+      if (!target || target.disabled || state.screenSending) return;
+      event.preventDefault();
+      sendFromSessionTextarea(target);
+    });
+
+    els.sessionPage.addEventListener("change", (event) => {
+      const select = event.target.closest("[data-session-screen-select]");
+      if (!select) return;
+      assignScreen(select.getAttribute("data-session-screen-select"), select.value);
+    });
+
+    window.addEventListener("popstate", async () => {
+      const key = routeSessionKey();
+      state.routeSessionKey = key;
+      state.detailKey = key;
+      state.detailTimeline = [];
+      state.detailError = "";
+      state.detailTerminalCapture = "";
+      state.detailTerminalError = "";
+      render();
+      if (key) {
+        await loadDetails(key);
+        await loadApprovals(key);
+      }
+    });
+
+    window.setInterval(autoRefresh, AUTO_REFRESH_MS);
+    window.setInterval(() => {
+      if (state.routeSessionKey) loadApprovals(state.routeSessionKey, { quiet: true });
+    }, 3_000);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) autoRefresh();
+    });
+
+    async function init() {
+      state.routeSessionKey = routeSessionKey();
+      state.detailKey = state.routeSessionKey;
+      await loadSettings();
+      await loadConfiguredHosts(false);
+      await load();
+      if (state.detailKey) {
+        await loadDetails(state.detailKey);
+        await loadApprovals(state.detailKey);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
