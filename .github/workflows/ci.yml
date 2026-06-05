@@ -18,6 +18,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
       - name: Compile check
-        run: python -m py_compile app.py core/*.py
-      - name: Import check
-        run: python -c "import app; from core import actions, codex, history, memory, patrol, perms, plans, search, sessions, skills, transcripts"
+        run: |
+          python -m py_compile app.py
+          find agent_console -name "*.py" -print0 | xargs -0 python -m py_compile
+      - name: Test
+        run: python -m unittest discover -s tests/agent_console -v
