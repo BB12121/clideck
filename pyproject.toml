@@ -5,6 +5,7 @@ description = "Web console for monitoring and controlling local and remote CLI a
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115",
+    "httpx2>=2.0",
     "paramiko>=3.4",
     "tomli>=2; python_version < '3.11'",
     "uvicorn[standard]>=0.32",
