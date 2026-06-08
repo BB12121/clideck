@@ -569,6 +569,63 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
 
+    .event-detail-group {
+      justify-self: start;
+      width: min(760px, 86%);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .event-detail-group summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      border: 1px solid var(--line-soft);
+      border-radius: 999px;
+      background: #151515;
+      padding: 5px 9px;
+    }
+
+    .event-detail-title {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .event-detail-count {
+      color: var(--faint);
+    }
+
+    .event-detail-list {
+      display: grid;
+      gap: 7px;
+      margin-top: 8px;
+      border-left: 1px solid var(--line);
+      padding-left: 10px;
+    }
+
+    .event-detail-row {
+      display: grid;
+      gap: 4px;
+      border: 1px solid var(--line-soft);
+      border-radius: 6px;
+      background: #141414;
+      padding: 8px;
+    }
+
+    .event-detail-row .chat-role {
+      color: var(--faint);
+    }
+
+    .event-detail-text {
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
     .markdown {
       white-space: normal;
     }
@@ -797,6 +854,10 @@
 
     .session-chat .chat-message.collapsible {
       max-width: min(980px, 92%);
+    }
+
+    .session-chat .event-detail-group {
+      max-width: min(880px, 88%);
     }
 
     .session-chat .chat-role {
@@ -1827,11 +1888,63 @@
       return null;
     }
 
+    function isDialogueMessage(message) {
+      return message.kind === "user" || message.kind === "assistant";
+    }
+
+    function eventDetailLabel(messages) {
+      const toolCount = messages.filter((message) => message.kind === "tool").length;
+      const systemCount = messages.length - toolCount;
+      if (toolCount && systemCount) return `${toolCount} tool, ${systemCount} system`;
+      if (toolCount) return `${toolCount} tool event${toolCount === 1 ? "" : "s"}`;
+      return `${systemCount} system event${systemCount === 1 ? "" : "s"}`;
+    }
+
+    function renderEventDetailGroup(messages) {
+      if (!messages.length) return "";
+      const rows = messages.map((message) => `
+        <div class="event-detail-row ${escapeHtml(message.kind)}">
+          <div class="chat-role">${escapeHtml(message.label)}</div>
+          <div class="event-detail-text">${escapeHtml(message.text)}</div>
+        </div>
+      `).join("");
+      return `
+        <details class="event-detail-group">
+          <summary>
+            <span class="event-detail-title">Process details</span>
+            <span class="event-detail-count">${escapeHtml(eventDetailLabel(messages))}</span>
+          </summary>
+          <div class="event-detail-list">${rows}</div>
+        </details>
+      `;
+    }
+
+    function renderConversationWithDetails(messages) {
+      const html = [];
+      let detailBuffer = [];
+      const flushDetails = () => {
+        if (!detailBuffer.length) return;
+        html.push(renderEventDetailGroup(detailBuffer));
+        detailBuffer = [];
+      };
+
+      for (const message of messages) {
+        if (!isDialogueMessage(message) && !message.pending) {
+          detailBuffer.push(message);
+          continue;
+        }
+        flushDetails();
+        html.push(renderChatMessage(message.kind, message.label, message.text, {
+          pending: message.pending,
+          thinking: message.pendingThinking,
+        }));
+      }
+      flushDetails();
+      return html.join("");
+    }
+
     function renderChatMessages(messages) {
-      return messages.map((message) => renderChatMessage(message.kind, message.label, message.text, {
-        pending: message.pending,
-        thinking: message.pendingThinking,
-      })).join("");
+      return renderConversationWithDetails(messages);
     }
 
     function renderDetailMessages(session, options = {}) {
