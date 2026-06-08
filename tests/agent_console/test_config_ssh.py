@@ -279,6 +279,26 @@ class ConfigAndSshCollectorTests(unittest.TestCase):
         self.assertEqual(args[2], "secret")
         self.assertIn("before = 9", args[1])
 
+    def test_read_ssh_timeline_uses_python_none_for_missing_before_cursor(self):
+        payload = {"timeline": [], "error": None, "next_before": 0, "has_more": False}
+        with patch(
+            "agent_console.collectors.ssh._run_probe",
+            return_value=SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr=""),
+        ) as run_probe:
+            rows, error, next_before, has_more = read_ssh_timeline(
+                "user@gpu-a",
+                "/home/u/rollout.jsonl",
+                limit=5,
+            )
+
+        self.assertEqual(rows, [])
+        self.assertIsNone(error)
+        self.assertEqual(next_before, 0)
+        self.assertFalse(has_more)
+        probe = run_probe.call_args.args[1]
+        self.assertIn("before = None", probe)
+        self.assertNotIn("before = null", probe)
+
     def test_send_ssh_screen_input_uses_remote_probe_and_sends_enter_separately(self):
         with patch(
             "agent_console.collectors.ssh._run_probe",

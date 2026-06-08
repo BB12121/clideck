@@ -906,10 +906,11 @@ def read_ssh_timeline(
     limit: int = 20,
     before: int | None = None,
 ) -> tuple[list[dict[str, Any]], str | None, int | None, bool]:
+    before_literal = "None" if before is None else json.dumps(max(0, before))
     probe = (
         REMOTE_TIMELINE_PROBE.replace("__PATH_JSON__", json.dumps(transcript_path))
         .replace("__LIMIT_JSON__", json.dumps(max(0, min(limit, 200))))
-        .replace("__BEFORE_JSON__", json.dumps(before))
+        .replace("__BEFORE_JSON__", before_literal)
     )
     try:
         result = _run_probe(ssh_target, probe, password, timeout_seconds)
