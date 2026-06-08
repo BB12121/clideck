@@ -41,6 +41,24 @@ CliDeck turns those loose CLI processes into a single operator console.
 
 ## Quick Start
 
+On Windows, double-click:
+
+```text
+CliDeck.cmd
+```
+
+The launcher creates a local `.venv`, installs CliDeck, starts the server, and
+opens the console in your browser. Keep the launcher window open while using the
+app. Press `Ctrl+C` in that window to stop it.
+
+You can also run the same launcher from PowerShell and override the port:
+
+```powershell
+.\CliDeck.cmd -Port 7879
+```
+
+Manual startup works on any platform:
+
 ```bash
 git clone https://github.com/YOUR_NAME/clideck.git
 cd clideck
