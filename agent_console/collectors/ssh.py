@@ -660,6 +660,7 @@ from pathlib import Path
 
 path = Path(__PATH_JSON__)
 limit = __LIMIT_JSON__
+before = __BEFORE_JSON__
 
 def main():
     if not path.is_absolute() or not path.is_file():
@@ -678,12 +679,17 @@ def main():
                     continue
                 if isinstance(row, dict) and row.get("type") != "session_meta":
                     rows.append(row)
-                    if len(rows) > limit:
-                        rows = rows[-limit:]
     except OSError as exc:
         print(json.dumps({"timeline": [], "error": str(exc)}))
         return
-    print(json.dumps({"timeline": rows, "error": None}))
+    end = len(rows) if before is None else min(max(0, before), len(rows))
+    start = max(0, end - limit)
+    print(json.dumps({
+        "timeline": rows[start:end],
+        "error": None,
+        "next_before": start,
+        "has_more": start > 0,
+    }))
 
 main()
 """
@@ -898,27 +904,35 @@ def read_ssh_timeline(
     password: str | None = None,
     timeout_seconds: int = 15,
     limit: int = 20,
-) -> tuple[list[dict[str, Any]], str | None]:
-    probe = REMOTE_TIMELINE_PROBE.replace("__PATH_JSON__", json.dumps(transcript_path)).replace(
-        "__LIMIT_JSON__", json.dumps(max(0, min(limit, 200)))
+    before: int | None = None,
+) -> tuple[list[dict[str, Any]], str | None, int | None, bool]:
+    probe = (
+        REMOTE_TIMELINE_PROBE.replace("__PATH_JSON__", json.dumps(transcript_path))
+        .replace("__LIMIT_JSON__", json.dumps(max(0, min(limit, 200))))
+        .replace("__BEFORE_JSON__", json.dumps(before))
     )
     try:
         result = _run_probe(ssh_target, probe, password, timeout_seconds)
     except Exception as exc:
-        return [], str(exc)
+        return [], str(exc), None, False
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
-        return [], detail or f"ssh exited with code {result.returncode}"
+        return [], detail or f"ssh exited with code {result.returncode}", None, False
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        return [], f"invalid timeline JSON: {exc}"
+        return [], f"invalid timeline JSON: {exc}", None, False
     if not isinstance(payload, dict):
-        return [], "remote timeline returned non-object JSON"
+        return [], "remote timeline returned non-object JSON", None, False
     rows = payload.get("timeline")
     if not isinstance(rows, list):
-        return [], _text(payload.get("error"), "remote timeline returned no events")
-    return [row for row in rows if isinstance(row, dict)], _text(payload.get("error"), None)
+        return [], _text(payload.get("error"), "remote timeline returned no events"), None, False
+    return (
+        [row for row in rows if isinstance(row, dict)],
+        _text(payload.get("error"), None),
+        _optional_int(payload.get("next_before")),
+        bool(payload.get("has_more")),
+    )
 
 
 def read_ssh_screen_capture(

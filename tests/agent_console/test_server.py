@@ -430,6 +430,39 @@ class AgentConsoleServerTests(unittest.TestCase):
         self.assertEqual(data["timeline"][0]["type"], "event_msg")
         self.assertEqual(data["timeline"][0]["payload"]["message"], "two")
         self.assertEqual(data["timeline"][1]["payload"]["message"], "three")
+        self.assertTrue(data["has_more"])
+        self.assertEqual(data["next_before"], 1)
+
+    def test_session_timeline_returns_older_local_transcript_page(self):
+        from agent_console import server
+
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "rollout.jsonl"
+            transcript.write_text(
+                "\n".join(
+                    [
+                        json.dumps({"type": "session_meta", "payload": {"id": "session-1"}}),
+                        json.dumps({"type": "event_msg", "payload": {"type": "user_message", "message": "one"}}),
+                        json.dumps({"type": "event_msg", "payload": {"type": "agent_message", "message": "two"}}),
+                        json.dumps({"type": "event_msg", "payload": {"type": "user_message", "message": "three"}}),
+                        json.dumps({"type": "event_msg", "payload": {"type": "agent_message", "message": "four"}}),
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            snapshot = self.make_snapshot()
+            snapshot.sessions[0].transcript_path = str(transcript)
+
+            with patch.object(server, "collect_all_hosts_once", return_value=[snapshot]):
+                response = TestClient(server.create_app()).get(
+                    "/api/sessions/local-codex-session/timeline?limit=2&before=2"
+                )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual([row["payload"]["message"] for row in data["timeline"]], ["one", "two"])
+        self.assertFalse(data["has_more"])
+        self.assertEqual(data["next_before"], 0)
 
     def test_session_timeline_missing_or_unreadable_transcript_returns_error_field(self):
         from agent_console import server
@@ -522,7 +555,7 @@ class AgentConsoleServerTests(unittest.TestCase):
         with (
             patch.object(server, "collect_all_hosts_once", return_value=[snapshot]),
             patch.object(server, "load_hosts", return_value=hosts),
-            patch.object(server, "read_ssh_timeline", return_value=(timeline, None)) as read_remote,
+            patch.object(server, "read_ssh_timeline", return_value=(timeline, None, 0, False)) as read_remote,
             patch.object(server, "read_ssh_screen_capture", return_value=("screen text", None)) as read_screen,
         ):
             response = TestClient(server.create_app()).get("/api/sessions/gpu-a-codex-session/timeline")
@@ -538,6 +571,7 @@ class AgentConsoleServerTests(unittest.TestCase):
             password="secret",
             timeout_seconds=22,
             limit=500,
+            before=None,
         )
         read_screen.assert_called_once_with(
             "user@gpu-a",

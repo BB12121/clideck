@@ -243,8 +243,11 @@ class ConfigAndSshCollectorTests(unittest.TestCase):
 
     def test_remote_timeline_probe_reads_transcript_path(self):
         self.assertIn("__PATH_JSON__", REMOTE_TIMELINE_PROBE)
+        self.assertIn("__BEFORE_JSON__", REMOTE_TIMELINE_PROBE)
         self.assertIn("timeline", REMOTE_TIMELINE_PROBE)
         self.assertIn("session_meta", REMOTE_TIMELINE_PROBE)
+        self.assertIn("next_before", REMOTE_TIMELINE_PROBE)
+        self.assertIn("has_more", REMOTE_TIMELINE_PROBE)
 
     def test_read_ssh_timeline_parses_remote_events(self):
         payload = {
@@ -252,18 +255,29 @@ class ConfigAndSshCollectorTests(unittest.TestCase):
                 {"type": "event_msg", "payload": {"type": "user_message", "message": "hello"}}
             ],
             "error": None,
+            "next_before": 4,
+            "has_more": True,
         }
         with patch(
             "agent_console.collectors.ssh._run_probe",
             return_value=SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr=""),
         ) as run_probe:
-            rows, error = read_ssh_timeline("user@gpu-a", "/home/u/rollout.jsonl", password="secret", limit=5)
+            rows, error, next_before, has_more = read_ssh_timeline(
+                "user@gpu-a",
+                "/home/u/rollout.jsonl",
+                password="secret",
+                limit=5,
+                before=9,
+            )
 
         self.assertIsNone(error)
+        self.assertEqual(next_before, 4)
+        self.assertTrue(has_more)
         self.assertEqual(rows[0]["payload"]["message"], "hello")
         args = run_probe.call_args.args
         self.assertEqual(args[0], "user@gpu-a")
         self.assertEqual(args[2], "secret")
+        self.assertIn("before = 9", args[1])
 
     def test_send_ssh_screen_input_uses_remote_probe_and_sends_enter_separately(self):
         with patch(

@@ -1298,8 +1298,12 @@
       routeSessionKey: "",
       detailKey: "",
       detailLoading: false,
+      detailLoadingMore: false,
       detailError: "",
+      detailOlderError: "",
       detailTimeline: [],
+      detailBefore: null,
+      detailHasMore: false,
       detailTerminalCapture: "",
       detailTerminalError: "",
       screenInputs: {},
@@ -1817,6 +1821,17 @@
       return String(text || "").replace(/\s+/g, " ").trim();
     }
 
+    function resetDetailTimeline() {
+      state.detailTimeline = [];
+      state.detailBefore = null;
+      state.detailHasMore = false;
+      state.detailLoadingMore = false;
+      state.detailError = "";
+      state.detailOlderError = "";
+      state.detailTerminalCapture = "";
+      state.detailTerminalError = "";
+    }
+
     function detailVisibleMessages(chronological = false) {
       const rows = chronological ? state.detailTimeline.slice().reverse() : state.detailTimeline;
       return dedupeMessages(rows.filter((row) => !isInternalTranscriptRow(row)).map((row) => ({
@@ -1951,6 +1966,11 @@
       const visibleMessages = detailVisibleMessages(Boolean(options.chronological));
       const pendingMessages = pendingMessagesForRender(session.key, visibleMessages);
       const chatMessages = [...visibleMessages, ...pendingMessages];
+      const olderStatus = state.detailLoadingMore
+        ? renderChatMessage("system", "Timeline", "Loading older conversation...", { expanded: true })
+        : state.detailOlderError
+          ? renderChatMessage("system", "Timeline", state.detailOlderError, { expanded: true })
+          : "";
       const messages = state.detailLoading
         ? (
             chatMessages.length
@@ -1966,7 +1986,7 @@
           : chatMessages.length
             ? renderChatMessages(chatMessages)
             : renderChatMessage("system", "Timeline", "No recent transcript events available.", { expanded: true });
-      return messages;
+      return `${olderStatus}${messages}`;
     }
 
     function scrollSessionChatToBottom() {
@@ -2768,6 +2788,7 @@
       if (state.detailLoading) return;
       state.detailLoading = !quiet;
       if (!quiet) state.detailError = "";
+      state.detailOlderError = "";
       render();
       try {
         const response = await fetch(sessionUrl(key, `/timeline?limit=${DETAIL_TIMELINE_LIMIT}`), { headers: { "Accept": "application/json" } });
@@ -2775,6 +2796,8 @@
         const data = await response.json();
         if (state.detailKey === key) {
           state.detailTimeline = Array.isArray(data.timeline) ? data.timeline.slice(-DETAIL_TIMELINE_LIMIT).reverse() : [];
+          state.detailBefore = Number.isInteger(data.next_before) ? data.next_before : null;
+          state.detailHasMore = Boolean(data.has_more);
           state.detailError = data.error || "";
           state.detailTerminalCapture = data.terminal_capture || "";
           state.detailTerminalError = data.terminal_error || "";
@@ -2786,6 +2809,40 @@
         state.detailLoading = false;
         if (state.detailKey === key) {
           render();
+        }
+      }
+    }
+
+    async function loadOlderDetails(key) {
+      if (!key || state.detailLoading || state.detailLoadingMore || !state.detailHasMore || state.detailBefore === null) return;
+      const previousScrollHeight = els.sessionChat.scrollHeight;
+      const previousScrollTop = els.sessionChat.scrollTop;
+      state.detailLoadingMore = true;
+      state.detailOlderError = "";
+      render();
+      try {
+        const url = sessionUrl(key, `/timeline?limit=${DETAIL_TIMELINE_LIMIT}&before=${encodeURIComponent(state.detailBefore)}`);
+        const response = await fetch(url, { headers: { "Accept": "application/json" } });
+        if (!response.ok) throw new Error(`Older timeline request failed with HTTP ${response.status}`);
+        const data = await response.json();
+        if (state.detailKey === key) {
+          const olderRows = Array.isArray(data.timeline) ? data.timeline.slice(-DETAIL_TIMELINE_LIMIT).reverse() : [];
+          state.detailTimeline = [...state.detailTimeline, ...olderRows];
+          state.detailBefore = Number.isInteger(data.next_before) ? data.next_before : null;
+          state.detailHasMore = Boolean(data.has_more);
+          state.detailOlderError = data.error || "";
+          reconcilePendingMessages(key);
+        }
+      } catch (error) {
+        if (state.detailKey === key) state.detailOlderError = error.message;
+      } finally {
+        state.detailLoadingMore = false;
+        if (state.detailKey === key) {
+          render();
+          window.requestAnimationFrame(() => {
+            const heightDelta = els.sessionChat.scrollHeight - previousScrollHeight;
+            els.sessionChat.scrollTop = previousScrollTop + Math.max(0, heightDelta);
+          });
         }
       }
     }
@@ -2816,18 +2873,12 @@
     async function toggleDetails(key) {
       if (state.detailKey === key) {
         state.detailKey = "";
-        state.detailTimeline = [];
-        state.detailError = "";
-        state.detailTerminalCapture = "";
-        state.detailTerminalError = "";
+        resetDetailTimeline();
         render();
         return;
       }
       state.detailKey = key;
-      state.detailTimeline = [];
-      state.detailError = "";
-      state.detailTerminalCapture = "";
-      state.detailTerminalError = "";
+      resetDetailTimeline();
       await loadDetails(key);
       await loadApprovals(key);
     }
@@ -2836,10 +2887,7 @@
       if (!key) return;
       state.routeSessionKey = key;
       state.detailKey = key;
-      state.detailTimeline = [];
-      state.detailError = "";
-      state.detailTerminalCapture = "";
-      state.detailTerminalError = "";
+      resetDetailTimeline();
       window.history.pushState({ sessionKey: key }, "", sessionPageUrl(key));
       render();
       await loadDetails(key);
@@ -2849,10 +2897,7 @@
     function closeSessionPage() {
       state.routeSessionKey = "";
       state.detailKey = "";
-      state.detailTimeline = [];
-      state.detailError = "";
-      state.detailTerminalCapture = "";
-      state.detailTerminalError = "";
+      resetDetailTimeline();
       window.history.pushState({}, "", `${appBasePath()}/`);
       render();
     }
@@ -3309,6 +3354,13 @@
       sendFromSessionTextarea(target);
     });
 
+    els.sessionChat.addEventListener("scroll", () => {
+      if (!state.routeSessionKey || !state.detailHasMore || state.detailLoading || state.detailLoadingMore) return;
+      if (els.sessionChat.scrollTop <= 48) {
+        loadOlderDetails(state.routeSessionKey);
+      }
+    });
+
     els.sessionPage.addEventListener("change", (event) => {
       const select = event.target.closest("[data-session-screen-select]");
       if (!select) return;
@@ -3319,10 +3371,7 @@
       const key = routeSessionKey();
       state.routeSessionKey = key;
       state.detailKey = key;
-      state.detailTimeline = [];
-      state.detailError = "";
-      state.detailTerminalCapture = "";
-      state.detailTerminalError = "";
+      resetDetailTimeline();
       render();
       if (key) {
         await loadDetails(key);

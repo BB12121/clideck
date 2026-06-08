@@ -302,14 +302,16 @@ def create_app() -> FastAPI:
         return {"q": q, "matches": matches}
 
     @app.get("/api/sessions/{key}/timeline")
-    def api_session_timeline(key: str, limit: int = MAX_TIMELINE_EVENTS) -> dict:
+    def api_session_timeline(key: str, limit: int = MAX_TIMELINE_EVENTS, before: int | None = None) -> dict:
         session, host = _find_session_or_404(app, key)
         bounded_limit = max(0, min(limit, MAX_TIMELINE_EVENTS))
+        bounded_before = max(0, before) if before is not None else None
         host_config = _host_config_by_id(host.host_id)
-        timeline, error = _read_timeline(
+        timeline, error, next_before, has_more = _read_timeline(
             session.transcript_path,
             bounded_limit,
             host_config,
+            before=bounded_before,
             allow_missing=session.source == "screen" and not session.transcript_path,
         )
         terminal_capture, terminal_error = _read_screen_capture(session, host_config)
@@ -318,6 +320,8 @@ def create_app() -> FastAPI:
             "host": _snapshot_host_context(host),
             "timeline": timeline,
             "error": error,
+            "next_before": next_before,
+            "has_more": has_more,
             "terminal_capture": terminal_capture,
             "terminal_error": terminal_error,
         }
@@ -967,12 +971,13 @@ def _read_timeline(
     limit: int,
     host_config: HostConfig | None = None,
     *,
+    before: int | None = None,
     allow_missing: bool = False,
-) -> tuple[list[dict[str, Any]], str | None]:
+) -> tuple[list[dict[str, Any]], str | None, int | None, bool]:
     if not transcript_path:
-        return [], None if allow_missing else "session has no transcript path"
+        return [], None if allow_missing else "session has no transcript path", None, False
     if limit <= 0:
-        return [], None
+        return [], None, before, bool(before)
     path = Path(transcript_path)
     if host_config and host_config.type == "ssh" and host_config.ssh:
         return read_ssh_timeline(
@@ -981,9 +986,10 @@ def _read_timeline(
             password=host_config.password,
             timeout_seconds=host_config.command_timeout_seconds,
             limit=limit,
+            before=before,
         )
     if not path.is_absolute() or not path.is_file():
-        return [], "transcript is not locally readable"
+        return [], "transcript is not locally readable", None, False
 
     events: list[dict[str, Any]] = []
     try:
@@ -998,11 +1004,11 @@ def _read_timeline(
                     continue
                 if isinstance(row, dict) and row.get("type") != "session_meta":
                     events.append(row)
-                    if len(events) > limit:
-                        events = events[-limit:]
     except OSError as exc:
-        return [], f"transcript is not locally readable: {exc}"
-    return events, None
+        return [], f"transcript is not locally readable: {exc}", None, False
+    end = min(max(0, before), len(events)) if before is not None else len(events)
+    start = max(0, end - limit)
+    return events[start:end], None, start, start > 0
 
 
 def _read_screen_capture(session, host_config: HostConfig | None) -> tuple[str, str | None]:

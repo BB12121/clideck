@@ -14,6 +14,16 @@ class StaticUiTests(unittest.TestCase):
         self.assertIn("function renderConversationWithDetails", html)
         self.assertIn("renderConversationWithDetails(messages)", html)
 
+    def test_session_chat_loads_older_timeline_on_top_scroll(self):
+        html = STATIC_HTML.read_text(encoding="utf-8")
+
+        self.assertIn("detailBefore", html)
+        self.assertIn("detailHasMore", html)
+        self.assertIn("async function loadOlderDetails", html)
+        self.assertIn("&before=${encodeURIComponent(state.detailBefore)}", html)
+        self.assertIn('els.sessionChat.addEventListener("scroll"', html)
+        self.assertIn("els.sessionChat.scrollTop <= 48", html)
+
 
 if __name__ == "__main__":
     unittest.main()
