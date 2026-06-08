@@ -57,6 +57,17 @@ You can also run the same launcher from PowerShell and override the port:
 .\CliDeck.cmd -Port 7879
 ```
 
+For a desktop-window experience that does not require opening a browser
+yourself, double-click:
+
+```text
+CliDeckDesktop.cmd
+```
+
+The desktop launcher installs the optional `desktop` dependencies, starts the
+same local CliDeck server, and opens the console inside a native desktop window.
+It still keeps all runtime state local to this checkout.
+
 Manual startup works on any platform:
 
 ```bash
