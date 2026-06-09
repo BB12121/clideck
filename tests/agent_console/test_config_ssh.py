@@ -308,7 +308,7 @@ class ConfigAndSshCollectorTests(unittest.TestCase):
             error = send_ssh_screen_input(
                 "user@gpu-a",
                 "1234.pdn",
-                "hello \"screen\"\nnext",
+                "hello \"screen\"\nnext \ud83d\ude00",
                 password="secret",
                 timeout_seconds=8,
             )
@@ -317,13 +317,16 @@ class ConfigAndSshCollectorTests(unittest.TestCase):
         args = run_probe.call_args.args
         self.assertEqual(args[0], "user@gpu-a")
         self.assertIn('"1234.pdn"', args[1])
-        self.assertIn('hello \\"screen\\"\\nnext', args[1])
+        self.assertIn("text_b64 =", args[1])
+        self.assertIn("base64.b64decode", args[1])
+        self.assertNotIn("\\ud83d", args[1])
         self.assertNotIn('next\\r', args[1])
         self.assertIn('["screen", "-S", session, "-X", "readbuf", path]', args[1])
         self.assertIn('["screen", "-S", session, "-X", "paste", "."]', args[1])
         self.assertIn("submit = True", args[1])
         self.assertNotIn("submit = true", args[1])
         self.assertIn("__SUBMIT_JSON__", REMOTE_SCREEN_INPUT_PROBE)
+        self.assertIn("__TEXT_B64_JSON__", REMOTE_SCREEN_INPUT_PROBE)
         self.assertIn('["screen", "-S", screen_session, "-X", "stuff", chr(13)]', REMOTE_SCREEN_INPUT_PROBE)
         self.assertEqual(args[2], "secret")
         self.assertEqual(args[3], 8)
@@ -362,7 +365,9 @@ class ConfigAndSshCollectorTests(unittest.TestCase):
         self.assertEqual(args[0], "user@gpu-a")
         self.assertIn('"codex-test"', args[1])
         self.assertIn('"codex --dangerously-bypass-approvals-and-sandbox"', args[1])
-        self.assertIn('"\\u4f60\\u597d"', args[1])
+        self.assertIn('"5L2g5aW9"', args[1])
+        self.assertIn("initial_prompt_b64 =", args[1])
+        self.assertIn("base64.b64decode", args[1])
         self.assertIn('["screen", "-S", session, "-X", "readbuf", path]', args[1])
         self.assertIn('["screen", "-S", session, "-X", "paste", "."]', args[1])
         self.assertIn('["screen", "-S", name, "-X", "stuff", chr(13)]', args[1])

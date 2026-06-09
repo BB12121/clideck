@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import re
 import subprocess
@@ -10,6 +11,13 @@ from agent_console.models import CollectorError, HostSession, HostSnapshot, now_
 
 CODEX_FULL_ACCESS_COMMAND = "codex --dangerously-bypass-approvals-and-sandbox"
 DEFAULT_REMOTE_CODEX_START_PROMPT = "你好"
+
+
+def _text_to_utf8_b64(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.encode("utf-16", errors="surrogatepass").decode("utf-16", errors="replace")
+    return base64.b64encode(normalized.encode("utf-8")).decode("ascii")
 
 
 REMOTE_PROBE = r"""
@@ -696,6 +704,7 @@ main()
 
 
 REMOTE_SCREEN_INPUT_PROBE = r"""
+import base64
 import json
 import os
 import subprocess
@@ -703,7 +712,8 @@ import tempfile
 import time
 
 screen_session = __SCREEN_SESSION_JSON__
-text = __TEXT_JSON__
+text_b64 = __TEXT_B64_JSON__
+text = base64.b64decode(text_b64).decode("utf-8", errors="replace") if isinstance(text_b64, str) else ""
 submit = __SUBMIT_JSON__
 
 def send_text(session, value):
@@ -808,6 +818,7 @@ main()
 
 
 REMOTE_START_SCREEN_PROBE = r"""
+import base64
 import json
 import os
 import re
@@ -818,7 +829,12 @@ import time
 cwd = __CWD_JSON__
 screen_name = __SCREEN_NAME_JSON__
 command = __COMMAND_JSON__
-initial_prompt = __INITIAL_PROMPT_JSON__
+initial_prompt_b64 = __INITIAL_PROMPT_B64_JSON__
+initial_prompt = (
+    base64.b64decode(initial_prompt_b64).decode("utf-8", errors="replace")
+    if isinstance(initial_prompt_b64, str)
+    else None
+)
 
 def slug(value):
     text = re.sub(r"[^A-Za-z0-9_.-]+", "-", value or "").strip(".-")
@@ -1050,7 +1066,7 @@ def send_ssh_screen_input(
 ) -> str | None:
     probe = (
         REMOTE_SCREEN_INPUT_PROBE.replace("__SCREEN_SESSION_JSON__", json.dumps(screen_session))
-        .replace("__TEXT_JSON__", json.dumps(text))
+        .replace("__TEXT_B64_JSON__", json.dumps(_text_to_utf8_b64(text)))
         .replace("__SUBMIT_JSON__", repr(bool(enter)))
     )
     try:
@@ -1080,7 +1096,7 @@ def start_ssh_screen_session(
         REMOTE_START_SCREEN_PROBE.replace("__CWD_JSON__", json.dumps(cwd or "~"))
         .replace("__SCREEN_NAME_JSON__", json.dumps(screen_name))
         .replace("__COMMAND_JSON__", json.dumps(remote_command))
-        .replace("__INITIAL_PROMPT_JSON__", json.dumps(initial_prompt))
+        .replace("__INITIAL_PROMPT_B64_JSON__", json.dumps(_text_to_utf8_b64(initial_prompt)))
     )
     try:
         result = _run_probe(ssh_target, probe, password, timeout_seconds)
