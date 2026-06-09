@@ -1276,6 +1276,7 @@
   <script>
     const AUTO_REFRESH_MS = 15_000;
     const DETAIL_TIMELINE_LIMIT = 80;
+    const PENDING_DETAIL_REFRESH_DELAYS = [700, 2_200, 5_000, 10_000, 20_000, 45_000];
     const NOTIFY_COMPLETED_KEY = "agentConsoleNotifyCompleted";
     const COMPLETED_STATUS = "completed";
 
@@ -1846,20 +1847,23 @@
       return messages.some((message) => message.kind === kind && normalizeMessageText(message.text) === target);
     }
 
-    function transcriptHasAssistantAfterUser(messages, text) {
+    function transcriptHasResponseAfterUser(messages, text) {
       const target = normalizeMessageText(text);
       const userIndex = messages.map((message) => (
         message.kind === "user" && normalizeMessageText(message.text) === target
       )).lastIndexOf(true);
       if (userIndex < 0) return false;
-      return messages.slice(userIndex + 1).some((message) => message.kind === "assistant");
+      return messages.slice(userIndex + 1).some((message) => (
+        message.kind === "assistant"
+        || (message.kind !== "user" && normalizeMessageText(message.text))
+      ));
     }
 
     function pendingMessagesForRender(key, transcriptMessages) {
       const pending = state.pendingMessages[key] || [];
       return pending.filter((message) => {
         if (message.pendingUser) return !transcriptHasMessage(transcriptMessages, "user", message.text);
-        if (message.pendingThinking) return !transcriptHasAssistantAfterUser(transcriptMessages, message.userText);
+        if (message.pendingThinking) return !transcriptHasResponseAfterUser(transcriptMessages, message.userText);
         return true;
       });
     }
@@ -1884,6 +1888,10 @@
           { id, kind: "assistant", label: assistantLabel, text: "Thinking", userText: text, pending: true, pendingThinking: true },
         ],
       };
+    }
+
+    function hasPendingThinking(key) {
+      return (state.pendingMessages[key] || []).some((message) => message.pendingThinking);
     }
 
     function removePendingCodexTurn(key, text) {
@@ -2847,6 +2855,15 @@
       }
     }
 
+    function schedulePendingDetailRefresh(key) {
+      for (const delay of PENDING_DETAIL_REFRESH_DELAYS) {
+        window.setTimeout(async () => {
+          if (state.detailKey !== key || !hasPendingThinking(key)) return;
+          await loadDetails(key, { quiet: true });
+        }, delay);
+      }
+    }
+
     async function loadApprovals(key, { quiet = true } = {}) {
       const found = findSessionByKey(key);
       if (!found || found.host.host_id !== "local" || found.session.platform !== "codex") return;
@@ -2945,8 +2962,7 @@
           throw new Error(detail.detail || `Screen input failed with HTTP ${response.status}`);
         }
         state.screenStatus = { ...state.screenStatus, [key]: "Sent to screen. Waiting for screen update." };
-        if (state.detailKey === key) window.setTimeout(() => loadDetails(key, { quiet: true }), 700);
-        if (state.detailKey === key) window.setTimeout(() => loadDetails(key, { quiet: true }), 2200);
+        schedulePendingDetailRefresh(key);
       } catch (error) {
         removePendingCodexTurn(key, sentText);
         if (!(state.screenInputs[key] || "").trim()) {
@@ -3025,9 +3041,8 @@
         };
         window.setTimeout(() => load({ refresh: true, quiet: true }), 300);
         window.setTimeout(() => loadApprovals(key, { quiet: true }), 500);
-        if (state.detailKey === key) window.setTimeout(() => loadDetails(key, { quiet: true }), 700);
         window.setTimeout(() => loadApprovals(key, { quiet: true }), 1800);
-        if (state.detailKey === key) window.setTimeout(() => loadDetails(key, { quiet: true }), 2200);
+        schedulePendingDetailRefresh(key);
       } catch (error) {
         removePendingCodexTurn(key, sentText);
         if (!(state.screenInputs[key] || "").trim()) {
