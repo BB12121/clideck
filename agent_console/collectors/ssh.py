@@ -697,12 +697,39 @@ main()
 
 REMOTE_SCREEN_INPUT_PROBE = r"""
 import json
+import os
 import subprocess
+import tempfile
 import time
 
 screen_session = __SCREEN_SESSION_JSON__
 text = __TEXT_JSON__
 submit = __SUBMIT_JSON__
+
+def send_text(session, value):
+    fd, path = tempfile.mkstemp(prefix="agent-console-input-", suffix=".txt")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(value)
+        result = subprocess.run(
+            ["screen", "-S", session, "-X", "readbuf", path],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return result
+        return subprocess.run(
+            ["screen", "-S", session, "-X", "paste", "."],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
 def main():
     if not isinstance(screen_session, str) or not screen_session.strip():
@@ -711,12 +738,7 @@ def main():
     if not isinstance(text, str) or not text:
         print("text is required")
         raise SystemExit(2)
-    result = subprocess.run(
-        ["screen", "-S", screen_session, "-X", "stuff", text],
-        capture_output=True,
-        text=True,
-        timeout=5,
-    )
+    result = send_text(screen_session, text)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "screen input failed").strip()
         print(detail)
@@ -790,6 +812,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import time
 
 cwd = __CWD_JSON__
@@ -800,6 +823,53 @@ initial_prompt = __INITIAL_PROMPT_JSON__
 def slug(value):
     text = re.sub(r"[^A-Za-z0-9_.-]+", "-", value or "").strip(".-")
     return text[:80] or time.strftime("codex-%Y%m%d-%H%M%S")
+
+def screen_exists(name):
+    try:
+        result = subprocess.run(["screen", "-ls"], capture_output=True, text=True, timeout=5)
+    except Exception:
+        return False
+    for line in result.stdout.splitlines():
+        parts = line.strip().split()
+        if not parts:
+            continue
+        token = parts[0]
+        if token == name or token.endswith("." + name):
+            return True
+    return False
+
+def wait_for_screen(name, timeout_seconds=6):
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        if screen_exists(name):
+            return True
+        time.sleep(0.2)
+    return screen_exists(name)
+
+def send_text(session, value):
+    fd, path = tempfile.mkstemp(prefix="agent-console-initial-", suffix=".txt")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(value)
+        result = subprocess.run(
+            ["screen", "-S", session, "-X", "readbuf", path],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return result
+        return subprocess.run(
+            ["screen", "-S", session, "-X", "paste", "."],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
 def main():
     name = slug(screen_name)
@@ -820,18 +890,25 @@ def main():
         detail = (result.stderr or result.stdout or "screen start failed").strip()
         print(json.dumps({"started": False, "error": detail}))
         return
+    if not wait_for_screen(name):
+        print(json.dumps({
+            "started": False,
+            "error": "screen session exited before it was ready; command may have failed: " + shell_command,
+        }))
+        return
     initial_prompt_sent = False
     if isinstance(initial_prompt, str) and initial_prompt.strip():
-        time.sleep(1.2)
-        result = subprocess.run(
-            ["screen", "-S", name, "-X", "stuff", initial_prompt],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
+        time.sleep(2.0)
+        if not screen_exists(name):
+            print(json.dumps({"started": False, "error": "screen session disappeared before initial prompt"}))
+            return
+        result = send_text(name, initial_prompt)
         if result.returncode != 0:
             detail = (result.stderr or result.stdout or "screen initial prompt failed").strip()
             print(json.dumps({"started": False, "error": detail}))
+            return
+        if not screen_exists(name):
+            print(json.dumps({"started": False, "error": "screen session disappeared before initial submit"}))
             return
         result = subprocess.run(
             ["screen", "-S", name, "-X", "stuff", chr(13)],

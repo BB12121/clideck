@@ -9,6 +9,7 @@ from agent_console.config import delete_host, discover_ssh_hosts, load_hosts, sa
 from agent_console.collectors.ssh import (
     REMOTE_PROBE,
     REMOTE_SCREEN_INPUT_PROBE,
+    REMOTE_START_SCREEN_PROBE,
     REMOTE_TIMELINE_PROBE,
     collect_ssh_snapshot,
     read_ssh_screen_capture,
@@ -318,6 +319,8 @@ class ConfigAndSshCollectorTests(unittest.TestCase):
         self.assertIn('"1234.pdn"', args[1])
         self.assertIn('hello \\"screen\\"\\nnext', args[1])
         self.assertNotIn('next\\r', args[1])
+        self.assertIn('["screen", "-S", session, "-X", "readbuf", path]', args[1])
+        self.assertIn('["screen", "-S", session, "-X", "paste", "."]', args[1])
         self.assertIn("submit = True", args[1])
         self.assertNotIn("submit = true", args[1])
         self.assertIn("__SUBMIT_JSON__", REMOTE_SCREEN_INPUT_PROBE)
@@ -360,10 +363,20 @@ class ConfigAndSshCollectorTests(unittest.TestCase):
         self.assertIn('"codex-test"', args[1])
         self.assertIn('"codex --dangerously-bypass-approvals-and-sandbox"', args[1])
         self.assertIn('"\\u4f60\\u597d"', args[1])
-        self.assertIn('["screen", "-S", name, "-X", "stuff", initial_prompt]', args[1])
+        self.assertIn('["screen", "-S", session, "-X", "readbuf", path]', args[1])
+        self.assertIn('["screen", "-S", session, "-X", "paste", "."]', args[1])
         self.assertIn('["screen", "-S", name, "-X", "stuff", chr(13)]', args[1])
         self.assertEqual(args[2], "secret")
         self.assertEqual(args[3], 8)
+
+    def test_start_screen_probe_waits_for_screen_before_initial_prompt(self):
+        self.assertIn("def screen_exists", REMOTE_START_SCREEN_PROBE)
+        self.assertIn("def wait_for_screen", REMOTE_START_SCREEN_PROBE)
+        self.assertIn("if not wait_for_screen(name)", REMOTE_START_SCREEN_PROBE)
+        self.assertIn("time.sleep(2.0)", REMOTE_START_SCREEN_PROBE)
+        self.assertIn("def send_text", REMOTE_START_SCREEN_PROBE)
+        self.assertIn("screen session exited before it was ready", REMOTE_START_SCREEN_PROBE)
+        self.assertIn("screen session disappeared before initial prompt", REMOTE_START_SCREEN_PROBE)
 
     def test_start_ssh_screen_session_rejects_unsafe_screen_name(self):
         result, error = start_ssh_screen_session("user@gpu-a", screen_name="bad name; rm")
